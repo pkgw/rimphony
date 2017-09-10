@@ -193,7 +193,7 @@ BesselJ_Debye_Eps_Exp(const double n, const double x)
     static double At[BESSEL_EPSILON_ORDER];
 
     if (x > 1.e55)
-        return 0.;
+        return NAN;
 
     if (first_time) {
         int m;
@@ -243,15 +243,63 @@ BesselJ_Debye_Eps_Exp(const double n, const double x)
 }
 
 
-// Parameter for lines that deliminate between various approximations to J_n(x)
-//  (values found empirically for n = 100..1e7)
-#define SLOPE1 (-6.627757624078600696e-01)
-#define SLOPE2 (-6.656260931106707801e-01)
-#define SLOPE3 (-6.543033585865805080e-01)
-#define INTERCEPT1 (1.063380408975875602e+00)
-#define INTERCEPT2 (2.563324856985127465e-01)
-#define INTERCEPT3 (2.720161927383055733e-01)
-#define N_JN 	(30.)
+/* The swiss-army-knife version. Requires x and n >= 0. Only especially good
+ * for n > 100. The approximations are based on those given in Chishtie et a.
+ * 2005.
+ *
+ * The parameters below are lines that deliminate between various
+ * approximations to J_n(x), found empirically for n = 100..1e7.
+ *
+ * For our particular application, the approximations are only used for n >
+ * 30; below this value, we use GSL, which only accepts integer `n` values.
+ * Therefore non-integer `n` values below 30 will give NAN back.
+ */
+
+#define SLOPE1 -6.627757624078600696e-01
+#define SLOPE2 -6.656260931106707801e-01
+#define SLOPE3 -6.543033585865805080e-01
+#define INTERCEPT1 1.063380408975875602e+00
+#define INTERCEPT2 2.563324856985127465e-01
+#define INTERCEPT3 2.720161927383055733e-01
+#define N_JN 30.
+
+double
+my_Bessel_J(const double n, const double x)
+{
+    double logn;
+
+    if (!(n >= 0 && x >= 0))
+        /* The above definition catches NAN inputs */
+        return NAN;
+
+    if (n < N_JN) {
+        int n_int = (int) n;
+
+        if (n_int != n)
+            return NAN;
+
+        return gsl_sf_bessel_Jn(n_int, x);
+    }
+
+    logn = log10(n);
+
+    if (x < n) {
+        double y = log10((n - x) / n);
+
+        if (x != n && y > SLOPE2 * logn + INTERCEPT2)
+            return BesselJ_Meissel_First(n, x);
+
+        return BesselJ_Debye_Eps_Exp(n, x);
+    } else {
+        double y = log10((x - n) / x);
+
+        if (x != n && y > SLOPE3 * logn + INTERCEPT3)
+            return BesselJ_Meissel_Second(n, x);
+
+        return BesselJ_Debye_Eps_Exp(n, x);
+    }
+}
+
 
 /******************************************************************************************/
 /******************************************************************************************
@@ -288,76 +336,4 @@ double my_Bessel_dJ(double n, double x)
     return((n*bessel_func)/(x+DBL_MIN) - jnp1);
   }
   return(n*(bessel_func)/x - jnp1);
-}
-
-/******************************************************************************************/
-/******************************************************************************************
-   my_Bessel_J():
-   ----------------
-       -- requires x > 0, and  n > 0;
-       -- only recommend for  n > 100  ,  use glibc function jn() otherwise;
-       -- returns approximate value of the Bessel function "J_n(x)";
-       -- approximations based on those given in Chishtie et al. 2005
-******************************************************************************************/
-double my_Bessel_J(double n, double x)
-{
-  double fn, y, logn;
-  double BesselJ_Debye_Eps_Exp(double n, double x);
-  double BesselJ_Meissel_First(double n, double x);
-
-//#if FLAG_N_JN == JN_C_LIB
-  /* At least for GNU C Library, jn(n,x) requires n to be integer. */
- if(n < N_JN) {
-    return(gsl_sf_bessel_Jn((int)n,x));
-  }
-//#elif FLAG_N_JN == JN_C_LIB_interpolate
-//  double dn;
-//  int ni;
-
-  /* At least for GNU C Library, jn(n,x) requires n to be integer. Therefore linear
-   *  interpolation is used to calculate J_n. */
-  /* If we just return jn(n,x), the bessel function at small n is a step function with
-   *  jumps at every integer. The integrand of n integration becomes spiky for n < N_JN */
-//  if(n < N_JN) {
-//    ni = (int)n;
-//    dn = n - ni;
-
-//    return((1.-dn)*jn(ni,x) + dn*jn(ni+1,x));
-//  }
-//#elif FLAG_N_JN == JN_GSL
-//  if(n < N_JN) {
-//    return(gsl_sf_bessel_Jnu(n,x));
-//  }
-//#elif FLAG_N_JN == JN_Chishtie
-//#else
-//  #error "FLAG_N_JN is not set correctly"
-//#endif
-
-  fn = n;
-  logn = log10(fn);
-
-  if(x < fn)  {
-    y = log10((fn - x)/fn);
-
-    if(x!=fn) {
-      // May be useful to speed things up :
-//      if(y > (SLOPE1*logn+INTERCEPT1)) {
-//	return(0.);
-//      }
-      if(y > (SLOPE2*logn+INTERCEPT2)) {
-	return(BesselJ_Meissel_First(n , x));
-      }
-    }
-    return(BesselJ_Debye_Eps_Exp(n , x));
-  }
-  else {
-    y = log10((x - fn)/x);
-
-    if((x!=fn) && (y > (SLOPE3*logn+INTERCEPT3))) {
-      return(BesselJ_Meissel_Second(n , x));
-    }
-    return(BesselJ_Debye_Eps_Exp(n , x));
-  }
-
-
 }
