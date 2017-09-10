@@ -72,6 +72,17 @@ BesselJ_bigx(const double n, const double x)
 }
 
 
+/* Valid for x/n << 1 and n >> 1; leading order terms are O(1/n) and O(x/n) */
+static inline double
+BesselJ_Asympt1(const double n, const double x)
+{
+    double z = x / n;
+    double factor = 1. / sqrt(2 * M_PI * (n + 1));
+    double exp_val = n * (1 + log(0.5 * z));
+    return exp_factor(factor, exp_val);
+}
+
+
 // Parameter for lines that deliminate between various approximations to J_n(x)
 //  ( values found empirically for n = 100..1e7 )
 #define SLOPE1 (-6.627757624078600696e-01)
@@ -134,7 +145,6 @@ double my_Bessel_J( double n, double x )
   double BesselJ_Debye_Eps_Exp(  double n, double x ) ;
   double BesselJ_Meissel_First(  double n, double x ) ;
   double BesselJ_Meissel_Second( double n, double x ) ;
-  double BesselJ_Asympt1(        double n, double x);
 
 //#if FLAG_N_JN == JN_C_LIB
   /* At least for GNU C Library, jn(n,x) requires n to be integer. */
@@ -359,22 +369,3 @@ double BesselJ_Meissel_Second( double n, double x )
 
   return( retval ) ;
 }
-
-/******************************************************************************************/
-/******************************************************************************************
-  BesselJ_Asympt1():
-  ------------------
-  -- valid for x/n << 1 and  n>>1
-  --  leading order terms are  O(1/n) and O(x/n);
- ******************************************************************************************/
-double BesselJ_Asympt1( double n, double x)
-{
-  double z, factor, exp_val;
-
-  z = x/n;
-  factor = 1./sqrt(2*M_PI*(n+1));
-  exp_val = n*( 1 + log(0.5*z) );
-  return( exp_factor( factor, exp_val ) );
-}
-
-/******************************************************************************************/
