@@ -83,6 +83,43 @@ BesselJ_Asympt1(const double n, const double x)
 }
 
 
+/* Meissel's "second" expansion, specified to higher-order by Chishtie et al.
+ * 2005. Good for x >> n.
+*/
+static inline double
+BesselJ_Meissel_Second(const double n, const double x)
+{
+    const double z = x / n;
+    const double eps = (x - n) / n;
+    const double Z = sqrt(eps * (1 + z));
+    const double U = 1. / (n * Z * Z * Z);
+    const double t1 = z * z;
+    const double t2 = U * U;
+
+    // P_n sum (exponent = -Psum, so this is -Psum)
+    const double exp_val =
+        (t1 * t2 * (-3072 - 768 * t1 + (3072 + (27648 + (22272 + 1248 * t1) * t1) * t1 +
+        (-3072 + (-165120 + (-952576 + (-1119552 + (-271488 - 6592 * t1) * t1) * t1) * t1) *
+         t1 + (3072 + (744960 + (15287808 + (72179904 + (102842688 + (45756144 + (5297808 +
+        71391 * t1) * t1) * t1) * t1) * t1) * t1) * t1) * t2) * t2) * t2)) / 0.12288e5;
+
+    // Part 1 of Q_n sum
+    const double Qt = n * (Z - acosl(n / x));
+
+    // Part 2 of Q_n sum
+    const double Qsum =
+        -(U * (860160 + 1290240 * t1 + (28672 + (-2709504 + (-6547968 - 672000 * t1) * t1) *
+        t1 + (8192 + (2519040 + (60518400 + (151828480 + (61254720 + 2163168 * t1) * t1) * t1) *
+        t1) * t1 + (-6144 + (2644992 + (299351808 + (3405435264 + (8653594320 + (5897669400 +
+        (954875250 + 16907985 * t1) * t1) * t1) * t1) * t1) * t1) * t1) * t2) * t2) * t2)) /
+        0.10321920e8;
+
+    const double factor = sqrt(2 / (M_PI * n * Z)) * cosl(Qsum + Qt - M_PI_4);
+
+    return exp_factor(factor, exp_val);
+}
+
+
 // Parameter for lines that deliminate between various approximations to J_n(x)
 //  ( values found empirically for n = 100..1e7 )
 #define SLOPE1 (-6.627757624078600696e-01)
@@ -144,7 +181,6 @@ double my_Bessel_J( double n, double x )
   double fn, y, logn;
   double BesselJ_Debye_Eps_Exp(  double n, double x ) ;
   double BesselJ_Meissel_First(  double n, double x ) ;
-  double BesselJ_Meissel_Second( double n, double x ) ;
 
 //#if FLAG_N_JN == JN_C_LIB
   /* At least for GNU C Library, jn(n,x) requires n to be integer. */
@@ -325,45 +361,6 @@ double BesselJ_Meissel_First( double n, double x )
   else {
     exp_val = n*(  log(x*invZp1) - (1 - Z) ) - Vsum1 - Vsum2 - lgamma(n) ;
   }
-
-  retval = exp_factor( factor, exp_val ) ;
-
-  return( retval ) ;
-}
-
-/******************************************************************************************/
-/******************************************************************************************
-  BesselJ_Meissel_Second():
-  -----------------------
-   -- Meissel's "Second" Expansion, specified to higher-order by Chishtie et al. 2005.
-   -- good for  x>>n
-******************************************************************************************/
-
-double BesselJ_Meissel_Second( double n, double x )
-{
-  double U, Z, eps, fn, z, Qt, Qsum, exp_val, factor;
-  double t1, t2, retval;
-
-  fn = n;
-  z = x/fn;
-  eps = (x-fn)/fn;
-  Z = sqrt(eps*(1+z));
-  U = 1./(n*Z*Z*Z);
-  t1 = z * z;
-  t2 = U * U;
-
-    // P_n sum  ( exponent = -Psum  , so this is  (-Psum) )
-  exp_val = (t1 * t2 * (-3072 - 768 * t1 + (3072 + (27648 + (22272 + 1248 * t1) * t1) * t1 + (-3072 + (-165120 + (-952576 + (-1119552 + (-271488 - 6592 * t1) * t1) * t1) * t1) * t1 + (3072 + (744960 + (15287808 + (72179904 + (102842688 + (45756144 + (5297808 + 71391 * t1) * t1) * t1) * t1) * t1) * t1) * t1) * t2) * t2) * t2)) / 0.12288e5;
-
-
-  // Part 1 of Q_n  sum
-  Qt = n * ( Z - acosl(fn/x) );
-
-  // Part 2 of Q_n  sum
-  Qsum = -(U * (860160 + 1290240 * t1 + (28672 + (-2709504 + (-6547968 - 672000 * t1) * t1) * t1 + (8192 + (2519040 + (60518400 + (151828480 + (61254720 + 2163168 * t1) * t1) * t1) * t1) * t1 + (-6144 + (2644992 + (299351808 + (3405435264 + (8653594320 + (5897669400 + (954875250 + 16907985 * t1) * t1) * t1) * t1) * t1) * t1) * t1) * t2) * t2) * t2)) / 0.10321920e8;
-
-
-  factor = sqrt( 2 / ( M_PI*n*Z ) ) * cosl( Qsum + Qt - M_PI_4 )  ;
 
   retval = exp_factor( factor, exp_val ) ;
 
