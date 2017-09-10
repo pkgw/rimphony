@@ -14,6 +14,7 @@ gcc = "^0.3"
 
 [dependencies]
 gsl-sys = { path = "../gsl-sys" }
+libc = "^0.2"
 
 [dev-dependencies]
 assert_approx_eq = "^1.0"

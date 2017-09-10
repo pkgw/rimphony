@@ -1,9 +1,10 @@
 #[cfg(test)] #[macro_use] extern crate assert_approx_eq;
 extern crate gsl_sys;
+extern crate libc;
 
 extern {
-    fn my_Bessel_J(n: f64, x: f64) -> f64;
-    fn my_Bessel_dJ(n: f64, x: f64) -> f64;
+    fn my_Bessel_J(n: libc::c_double, x: libc::c_double) -> libc::c_double;
+    fn my_Bessel_dJ(n: libc::c_double, x: libc::c_double) -> libc::c_double;
 }
 
 #[allow(non_snake_case)]
