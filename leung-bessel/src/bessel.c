@@ -28,8 +28,6 @@
 #include <float.h>
 #include <ctype.h>
 
-#define BESSEL_EPSILON_ORDER (16)
-
 
 /* Compute `f_factor * exp(f_exp)` with some extra precision and safety. */
 static inline double
@@ -181,6 +179,70 @@ BesselJ_Meissel_First(const double n, const double x)
 }
 
 
+/* The Debye "epsilon" expansion. Good for in the limit x -> n from either
+ * side but only valid very close to the limit; expansion is in the variable
+ * "eps = x - n". Because of the order of the epsilon used, this routine is
+ * limited to x < 1e55.
+ */
+#define BESSEL_EPSILON_ORDER 16
+
+static inline double
+BesselJ_Debye_Eps_Exp(const double n, const double x)
+{
+    static int first_time = 1;
+    static double At[BESSEL_EPSILON_ORDER];
+
+    if (x > 1.e55)
+        return 0.;
+
+    if (first_time) {
+        int m;
+
+        for (m = 0; m < BESSEL_EPSILON_ORDER; m++) {
+            double M = (m + 1) / 3.;
+            At[m] = sin(M_PI * M) * pow(6., M) * exp(lgamma(M));
+        }
+
+        first_time = 0;
+    }
+
+    const double ez = x - n;
+    const double z = pow(x, 1. / 3.);
+    const double t3 = z * z;
+    const double t4 = x * z;
+    const double t10 = t4 * t4;
+    const double t38 = 810485676000000 * At[4] * t3;
+    const double t44 = x;
+    const double t70 = At[7] * t3;
+    const double t93 = At[10] * t3;
+    const double t107 = At[13] * t3;
+    const double t114 = ez * ez;
+    const double t146 = t10 * t10;
+    const double t149 =
+        ((-5403237840000 * At[6] + (69470200800000 * At[4] + 19451656224000000 *
+        At[0] * t4) * t3) * t10 * z + (-401283384 * At[15] + (4707059994 * At[13] +
+        (3012121710 * At[12] + (-36011689560 * At[10] + (8027667648000 * At[9] +
+        (-8027667648000 * At[7] + (-1296777081600000 * At[3] + 19451656224000000 *
+        At[1] * t3) * t4) * t3) * z) * t3) * z) * t3 + ((-41423013450 * At[12] +
+        (484040056500 * At[10] + (67540473000000 * At[6] - t38) * t4) * t3) * t44 +
+        (1748257220 * At[15] + (-19964735910 * At[13] + (-2594411820000 * At[9] +
+        (29331862560000 * At[7] + 3241942704000000 * At[3] * t4) * t3) * t4) * t3 +
+        ((78248884350 * At[12] + (-860873013000 * At[10] + (-94556662200000 * At[6] +
+        t38) * t4) * t3) * t44 + (-1938419560 * At[15] + (20997160275 * At[13] +
+        (2283511230000 * At[9] - 21612951360000 * t70) * t4) * t3 + ((-47153256150 *
+        At[12] + (459918459000 * At[10] + 27016189200000 * At[6] * t4) * t3) * t44 +
+        (849093050 * At[15] + (-8397889500 * At[13] + (-643242600000 * At[9] +
+        3859455600000 * t70) * t4) * t3 + ((11448186750 * At[12] - 88445857500 * t93) *
+        t44 + (-173573400 * At[15] + (1474097625 * At[13] + 53603550000 * At[9] * t4) *
+        t3 + ((-1161410250 * At[12] + 5360355000 * t93) * t44 + (-113704500 * t107 +
+        17481100 * At[15] + (40608750 * At[12] * t44 + (-833000 * At[15] + 3123750 *
+        t107 + 14875 * At[15] * t114) * ez) * ez) * ez) * ez) * ez) * ez) * ez) * ez) *
+        ez) * ez) * ez) * ez) * ez) / (M_PI * t146 * 0.58354968672000000e17);
+
+    return t149;
+}
+
+
 // Parameter for lines that deliminate between various approximations to J_n(x)
 //  (values found empirically for n = 100..1e7)
 #define SLOPE1 (-6.627757624078600696e-01)
@@ -298,75 +360,4 @@ double my_Bessel_J(double n, double x)
   }
 
 
-}
-
-/******************************************************************************************/
-/******************************************************************************************
-  BesselJ_Debye_Eps_Exp():
-  -----------------------
-        -- the x -> n  limits from either side;
-        -- valid for a very narrow region around  x=n;
-        -- expansion w.r.t. variable "eps",  eps = x - n
-
-        -- because of the order of the eps used, this routine is limited to x < 1e55;
-
- ******************************************************************************************/
-
-double BesselJ_Debye_Eps_Exp(double n , double x)
-{
-
-  static int  first_time = 1;
-  double z, ez;
-  double t3, t4, t10, t38, t44, t70, t93, t107, t114, t146,t149;
-  static double At[BESSEL_EPSILON_ORDER];
-  void  set_At(double At[BESSEL_EPSILON_ORDER]);
-
-  if(first_time) {
-    set_At(At);
-    first_time = 0;
-  }
-
-  if(x > 1.e55) {
-    return(0.);
-  }
-
-  ez = x - n;
-  z = pow(x, (1./3.));
-
-  t3 = z * z;
-  //t4 =  t3 * t3;   // z^4 = x^(4/3)
-  t4 =  x * z;      // z^4 = x^(4/3)
-  t10 = t4 *  t4;    // z^8 = x^(8/3)
-  t38 = 810485676000000 * At[4] * t3;
-  //t44 = t3 * z;
-  t44 = x;
-  t70 = At[7] * t3;
-  t93 = At[10] * t3;
-  t107 = At[13] * t3;
-  t114 =  ez * ez;
-  t146 = t10 * t10;
-  t149 = ((-5403237840000 * At[6] + (69470200800000 * At[4] + 19451656224000000 * At[0] * t4) * t3) * t10 * z + (-401283384 * At[15] + (4707059994 * At[13] + (3012121710 * At[12] + (-36011689560 * At[10] + (8027667648000 * At[9] + (-8027667648000 * At[7] + (-1296777081600000 * At[3] + 19451656224000000 * At[1] * t3) * t4) * t3) * z) * t3) * z) * t3 + ((-41423013450 * At[12] + (484040056500 * At[10] + (67540473000000 * At[6] - t38) * t4) * t3) * t44 + (1748257220 * At[15] + (-19964735910 * At[13] + (-2594411820000 * At[9] + (29331862560000 * At[7] + 3241942704000000 * At[3] * t4) * t3) * t4) * t3 + ((78248884350 * At[12] + (-860873013000 * At[10] + (-94556662200000 * At[6] + t38) * t4) * t3) * t44 + (-1938419560 * At[15] + (20997160275 * At[13] + (2283511230000 * At[9] - 21612951360000 * t70) * t4) * t3 + ((-47153256150 * At[12] + (459918459000 * At[10] + 27016189200000 * At[6] * t4) * t3) * t44 + (849093050 * At[15] + (-8397889500 * At[13] + (-643242600000 * At[9] + 3859455600000 * t70) * t4) * t3 + ((11448186750 * At[12] - 88445857500 * t93) * t44 + (-173573400 * At[15] + (1474097625 * At[13] + 53603550000 * At[9] * t4) * t3 + ((-1161410250 * At[12] + 5360355000 * t93) * t44 + (-113704500 * t107 + 17481100 * At[15] + (40608750 * At[12] * t44 + (-833000 * At[15] + 3123750 * t107 + 14875 * At[15] * t114) * ez) * ez) * ez) * ez) * ez) * ez) * ez) * ez) * ez) * ez) * ez) * ez) * ez) / (M_PI * t146 * 0.58354968672000000e17);
-
-  return(t149);
-
-
-}
-
-
-/******************************************************************************************/
-/******************************************************************************************
- set_At():
- --------
-    -- utility routine to set constant array used by   BesselJ_Debye_Eps_Exp():
- ******************************************************************************************/
-void  set_At(double At[BESSEL_EPSILON_ORDER])
-{
-  int m;
-  double M;
-
-  for(m = 0; m < BESSEL_EPSILON_ORDER; m++) {
-    M = (m+1)/3.;
-    At[m] = sin(M_PI*M) * pow(6., M) * exp(lgamma(M));
-  }
-  return;
 }
