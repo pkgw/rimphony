@@ -64,7 +64,7 @@ double my_Bessel_dJ( double n, double x)
   
   bessel_func  = my_Bessel_J(   n,   x );
   jnp1 = my_Bessel_J( (n+1), x );
-#if FLAG_JNprime_EQ == JNprime_EQ1
+
   // **** problem: how about if n is between 0 and 1?
   if(x == 0.) {
     if(n >= 2.) return(0.); /* J_n(0) = 0 for n >= 1, then the recursive relation gives
@@ -73,19 +73,6 @@ double my_Bessel_dJ( double n, double x)
     return( (n*bessel_func)/(x+DBL_MIN) - jnp1 );
   }
   return( n*(bessel_func)/x - jnp1 );
-#elif FLAG_JNprime_EQ == JNprime_EQ2
-  double jnm1 = my_Bessel_J( (n-1), x );
-
-  // **** problem: how about if n is between 0 and 1?
-  if(x == 0.) {
-    if(n >= 2.) return(0.); /* J_n(0) = 0 for n >= 1, then the recursive relation gives
-                             * a zero derivative for n >= 2 */
-    if(n == 0.) return(-jnp1); /* d(J_0(z))/dz = -J_1(z) */
-  }
-
-  /*  2 d(J_n(z))/dz = J_{n-1}(z) - J_{n+1)(z) */
-  return( 0.5*(jnm1-jnp1) );
-#endif
 }
 
 /******************************************************************************************/
