@@ -1,0 +1,11 @@
+[package]
+name = "rimphony"
+version = "0.1.0"
+authors = ["Peter Williams <peter@newton.cx>"]
+license = "MIT"
+
+[workspace]
+
+[dependencies]
+gsl-sys = { path = "gsl-sys" }
+leung-bessel = { path = "leung-bessel" }

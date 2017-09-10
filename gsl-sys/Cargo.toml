@@ -1,0 +1,10 @@
+[package]
+name = "gsl-sys"
+version = "0.1.0"
+authors = ["Peter Williams <peter@newton.cx>"]
+links = "gsl"
+build = "build.rs"
+license = "MIT/Apache-2.0"
+
+[build-dependencies]
+bindgen = "0.26"

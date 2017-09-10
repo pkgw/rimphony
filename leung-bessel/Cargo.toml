@@ -1,0 +1,19 @@
+[package]
+name = "leung-bessel"
+version = "0.1.0"
+authors = [
+  "Peter Williams <peter@newton.cx>",
+  "Alex Pandya <aapandy2@illinois.edu>",
+  "Po Kin Leung <pkleung@phy.cuhk.edu.hk>"
+]
+build = "build.rs"
+license = "MIT"
+
+[build-dependencies]
+gcc = "^0.3"
+
+[dependencies]
+gsl-sys = { path = "../gsl-sys" }
+
+[dev-dependencies]
+assert_approx_eq = "^1.0"
