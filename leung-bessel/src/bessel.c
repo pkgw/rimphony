@@ -14,19 +14,9 @@
  * Kin Leung, 2016 Alex Pandya, and 2017 Peter Williams.
  */
 
-#include <gsl/gsl_integration.h>
-#include <gsl/gsl_spline.h>
-#include <gsl/gsl_sf_gamma.h>
-#include <gsl/gsl_sf_bessel.h>
-#include <gsl/gsl_deriv.h>
-#include <gsl/gsl_errno.h>
-
-/* other C header files */
-#include <stdio.h>
-#include <stdlib.h>
-#include <math.h>
 #include <float.h>
-#include <ctype.h>
+#include <math.h>
+#include <gsl/gsl_sf_bessel.h>
 
 
 /* Compute `f_factor * exp(f_exp)` with some extra precision and safety. */
