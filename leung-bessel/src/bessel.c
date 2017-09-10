@@ -83,9 +83,9 @@ BesselJ_Asympt1(const double n, const double x)
 }
 
 
-/* Meissel's "second" expansion, specified to higher-order by Chishtie et al.
+/* Meissel's "second" expansion, specified to higher order by Chishtie et al.
  * 2005. Good for x >> n.
-*/
+ */
 static inline double
 BesselJ_Meissel_Second(const double n, const double x)
 {
@@ -115,6 +115,67 @@ BesselJ_Meissel_Second(const double n, const double x)
         0.10321920e8;
 
     const double factor = sqrt(2 / (M_PI * n * Z)) * cosl(Qsum + Qt - M_PI_4);
+
+    return exp_factor(factor, exp_val);
+}
+
+
+/* Meissel's "first" expansion, specified to higher order by Chishtie et al.
+ * 2005. Good for x << n.
+ */
+static inline double
+BesselJ_Meissel_First(const double n, const double x)
+{
+    double exp_val;
+
+    const double z = x / n;
+    const double eps = (n - x) / n;
+    const double Z = sqrt(eps * (1 + z));
+    const double ninv = 1. / n;
+    const double U = 1. / (n * Z * Z * Z);
+    const double t1 = z * z;
+    const double t2 = ninv * ninv;
+
+    // Part 1 of V_n sum
+    const double Vsum1 =
+        (U * (860160 + 1290240 * t1 + ((-2580480 - 645120 * t1) * t1 + (-28672 + (2709504 +
+        (6547968 + 672000 * t1) * t1) * t1 + ((-2580480 + (-23224320 + (-18708480 -
+        1048320 * t1) * t1) * t1) * t1 + (-8192 + (-2519040 + (-60518400 + (-151828480 +
+        (-61254720 - 2163168 * t1) * t1) * t1) * t1) * t1 + ((2580480 + (138700800 +
+        (800163840 + (940423680 + (228049920 + 5537280 * t1) * t1) * t1) * t1) * t1) * t1 +
+        (6144 + (-2644992 + (-299351808 + (-3405435264 + (-8653594320 + (-5897669400 +
+        (-954875250 - 16907985 * t1) * t1) * t1) * t1) * t1) * t1) * t1 + (2580480 +
+        (625766400 + (12841758720 + (60631119360 + (86387857920 + (38435160960 +
+        (4450158720 + 59968440 * t1) * t1) * t1) * t1) * t1) * t1) * t1) * t1 * U) * U) *
+        U) * U) * U) * U) * U)) / 0.10321920e8;
+
+    // Part 2 of V_n sum
+    const double Vsum2 = -(ninv * (420 + (-14 + (-4 + 3 * t2) * t2) * t2)) / 0.5040e4;
+
+    // I substitute Gamma(n+1) with (n+1)*Gamma(n) in the denominator:
+    const double factor = 1. / ((n + 1.) * sqrt(Z));
+
+    if (eps < 1e-4 && n > 1e3) {
+        const double t3 = t2 * t2;
+        // O(1/n^k) part of -log(gamma(n)):
+        const double loggamma_exp = (ninv * (-420 + 14 * t2 - 4 * t3 + 3 * t3 * t2)) / 0.5040e4;
+        const double exp2 =
+            -n * sqrt(2.*eps) * eps * (0.984023040e9 + (0.442810368e9 + (0.303114240e9 +
+            (0.233192960e9 + (0.190139040e9 + (0.160692840e9 + 0.139204065e9 * eps) * eps) *
+            eps) * eps) * eps) * eps) / 0.1476034560e10;
+
+        exp_val = 0.5 * log(0.5 * n / M_PI) + loggamma_exp + exp2 - Vsum1 - Vsum2;
+    } else {
+        double invZp1;
+
+        // 1 / (1 + Z) to eigth order:
+        if (Z < 1.e-3)
+            invZp1 = 1 + (-1 + (1 + (-1 + (1 + (-1 + (1 - Z) * Z) * Z) * Z) * Z) * Z) * Z;
+        else
+            invZp1 = 1. / (1. + Z);
+
+        exp_val = n * (log(x * invZp1) - (1 - Z)) - Vsum1 - Vsum2 - lgamma(n);
+    }
 
     return exp_factor(factor, exp_val);
 }
@@ -308,61 +369,4 @@ void  set_At(double At[BESSEL_EPSILON_ORDER])
     At[m] = sin(M_PI*M) * pow(6., M) * exp(lgamma(M));
   }
   return;
-}
-
-/******************************************************************************************/
-/******************************************************************************************
-  BesselJ_Meissel_First():
-  -----------------------
-   -- Meissel's "First" Expansion, specified to higher-order by Chishtie et al. 2005.
-   -- good for  x<<n
-******************************************************************************************/
-
-double BesselJ_Meissel_First(double n, double x)
-{
-  double U, Z, eps, ninv, fn, z, Vsum1, Vsum2, exp_val, factor, exp2, invZp1;
-  double t1, t2, t3, retval, loggamma_exp;
-
-  fn =  n;
-  z = x/fn;
-  eps = (fn-x)/fn;
-  Z = sqrt(eps*(1+z));
-  ninv = 1./fn;
-  U = 1./(n*Z*Z*Z);
-  t1 = z * z;
-  t2 =  ninv * ninv;
-
-
-    // Part 1 of V_n sum
-  Vsum1  = (U * (860160 + 1290240 * t1 + ((-2580480 - 645120 * t1) * t1 + (-28672 + (2709504 + (6547968 + 672000 * t1) * t1) * t1 + ((-2580480 + (-23224320 + (-18708480 - 1048320 * t1) * t1) * t1) * t1 + (-8192 + (-2519040 + (-60518400 + (-151828480 + (-61254720 - 2163168 * t1) * t1) * t1) * t1) * t1 + ((2580480 + (138700800 + (800163840 + (940423680 + (228049920 + 5537280 * t1) * t1) * t1) * t1) * t1) * t1 + (6144 + (-2644992 + (-299351808 + (-3405435264 + (-8653594320 + (-5897669400 + (-954875250 - 16907985 * t1) * t1) * t1) * t1) * t1) * t1) * t1 + (2580480 + (625766400 + (12841758720 + (60631119360 + (86387857920 + (38435160960 + (4450158720 + 59968440 * t1) * t1) * t1) * t1) * t1) * t1) * t1) * t1 * U) * U) * U) * U) * U) * U) * U)) / 0.10321920e8;
-
-
-  // Part 2 of V_n  sum
-  Vsum2 = -(ninv * (420 + (-14 + (-4 + 3 * t2) * t2) * t2)) / 0.5040e4;
-
-  // I substitute  Gamma(n+1) with (n+1)*Gamma(n)  in the denominator:
-  factor  = 1./((fn+1.) * sqrt(Z));
-
-
-  // 1/(1+Z) to eigth order
-  if(Z < 1.e-3) {
-    invZp1 = 1 + (-1 + (1 + (-1 + (1 + (-1 + (1 - Z) * Z) * Z) * Z) * Z) * Z) * Z;
-  }
-  else {
-    invZp1 = 1./(1.+Z);
-  }
-
-  if((eps < 1.e-4) && (fn > 1.e3)) {
-    t3 = t2*t2;
-    loggamma_exp =  (ninv * (-420 + 14 * t2 - 4 * t3 + 3 * t3 * t2)) / 0.5040e4;  // O(1/n^k) part of -log(gamma(n))
-    exp2 = -fn * sqrt(2.*eps) * eps * (0.984023040e9 + (0.442810368e9 + (0.303114240e9 + (0.233192960e9 + (0.190139040e9 + (0.160692840e9 + 0.139204065e9 * eps) * eps) * eps) * eps) * eps) * eps) / 0.1476034560e10;
-    exp_val = 0.5*log(0.5*fn/M_PI) + loggamma_exp + exp2 - Vsum1 - Vsum2;
-  }
-  else {
-    exp_val = n*(log(x*invZp1) - (1 - Z)) - Vsum1 - Vsum2 - lgamma(n);
-  }
-
-  retval = exp_factor(factor, exp_val);
-
-  return(retval);
 }
