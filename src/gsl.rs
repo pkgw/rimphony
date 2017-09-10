@@ -63,7 +63,7 @@ pub struct IntegrationBuilder<'a, F: 'a> where F: FnMut(f64) -> f64 {
 
 
 extern "C" fn rust_integrand<F>(x: f64, ctxt: *mut raw::c_void) -> f64 where F: FnMut(f64) -> f64 {
-    let f: &mut &mut F = unsafe { mem::transmute(ctxt) };
+    let f: &mut F = unsafe { mem::transmute(ctxt) };
     f(x)
 }
 
@@ -111,7 +111,7 @@ impl<'a, F: 'a> IntegrationBuilder<'a, F> where F: FnMut(f64) -> f64 {
                     self.upper_bound,
                     self.epsabs,
                     self.epsrel,
-                    (*self.workspace.handle).size,
+                    (*self.workspace.handle).limit,
                     self.rule as raw::c_int,
                     self.workspace.handle,
                     &mut result,
@@ -124,7 +124,7 @@ impl<'a, F: 'a> IntegrationBuilder<'a, F> where F: FnMut(f64) -> f64 {
                     self.lower_bound,
                     self.epsabs,
                     self.epsrel,
-                    (*self.workspace.handle).size,
+                    (*self.workspace.handle).limit,
                     self.workspace.handle,
                     &mut result,
                     &mut abserr
