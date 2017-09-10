@@ -52,25 +52,6 @@ exp_factor(const double f_factor, const double f_exp)
 }
 
 
-/* Valid for x/n >> 1; leading order terms are O(1/x) */
-static inline double
-BesselJ_bigx(const double n, const double x)
-{
-    return sqrt(2. / (M_PI * x)) * cosl(x - M_PI_2 * (n + 0.5));
-}
-
-
-/* Valid for x/n << 1 and n >> 1; leading order terms are O(1/n) and O(x/n) */
-static inline double
-BesselJ_Asympt1(const double n, const double x)
-{
-    double z = x / n;
-    double factor = 1. / sqrt(2 * M_PI * (n + 1));
-    double exp_val = n * (1 + log(0.5 * z));
-    return exp_factor(factor, exp_val);
-}
-
-
 /* Meissel's "second" expansion, specified to higher order by Chishtie et al.
  * 2005. Good for x >> n.
  */
@@ -245,10 +226,8 @@ BesselJ_Debye_Eps_Exp(const double n, const double x)
  * Therefore non-integer `n` values below 30 will give NAN back.
  */
 
-#define SLOPE1 -6.627757624078600696e-01
 #define SLOPE2 -6.656260931106707801e-01
 #define SLOPE3 -6.543033585865805080e-01
-#define INTERCEPT1 1.063380408975875602e+00
 #define INTERCEPT2 2.563324856985127465e-01
 #define INTERCEPT3 2.720161927383055733e-01
 #define N_JN 30.
