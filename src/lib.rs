@@ -130,7 +130,7 @@ impl DistributionFunction for SynchrotronCalculator<PowerLawDistribution> {
         let norm = if let Some(n) = self.d.norm {
             n
         } else {
-            let n = 1. / s_normalize_f(self);
+            let n = 1. / s_normalize_f(self).unwrap();
             self.d.norm = Some(n);
             n
         };
@@ -176,7 +176,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
 
         self.stokes_v_switch = StokesVSwitch::PositiveLobe;
 
-        let n_integral_contrib = self.s_n_integration(n_minus);
+        let n_integral_contrib = self.s_n_integration(n_minus).unwrap_or(f64::NAN);
 
         if !n_integral_contrib.is_nan() {
             ans += n_integral_contrib;
@@ -184,7 +184,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
 
         if self.coeff.stokes() == Stokes::V {
             self.stokes_v_switch = StokesVSwitch::NegativeLobe;
-            let n_integral_contrib = self.s_n_integration(n_minus);
+            let n_integral_contrib = self.s_n_integration(n_minus).unwrap_or(f64::NAN);
             if !n_integral_contrib.is_nan() {
                 ans += n_integral_contrib;
             }
@@ -193,7 +193,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         ans
     }
 
-    fn s_n_integration(&mut self, n_minus: f64) -> f64 {
+    fn s_n_integration(&mut self, n_minus: f64) -> gsl::GslResult<f64> {
         /* from integrate.c */
 
         let mut n_start = (N_MAX + n_minus + 1.).floor();
@@ -210,26 +210,26 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         }
 
         while contrib.abs() >= (ans / TOLERANCE).abs() {
-            let deriv = self.s_derivative_of_n(n_start);
+            let deriv = self.s_derivative_of_n(n_start)?;
 
             if deriv.abs() < DERIV_TOL {
                 delta_n *= incr_step_factor;
             }
 
-            contrib = self.s_n_integral(n_start, n_start + delta_n);
+            contrib = self.s_n_integral(n_start, n_start + delta_n)?;
             ans += contrib;
             n_start += delta_n;
         }
 
-        ans
+        Ok(ans)
     }
 
-    fn s_derivative_of_n(&mut self, n_start: f64) -> f64 {
+    fn s_derivative_of_n(&mut self, n_start: f64) -> gsl::GslResult<f64> {
         /* from integrate.c */
-        gsl::deriv_central(|n| self.s_gamma_integration_result(n), n_start, 1e-8).value
+        gsl::deriv_central(|n| self.s_gamma_integration_result(n), n_start, 1e-8).map(|r| r.value)
     }
 
-    fn s_n_integral(&mut self, min: f64, max: f64) -> f64 {
+    fn s_n_integral(&mut self, min: f64, max: f64) -> gsl::GslResult<f64> {
         /* from integrate.c */
 
         let mut ws = gsl::IntegrationWorkspace::new(1000);
@@ -240,7 +240,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             .tolerance(0., 1e-3)
             .rule(gsl::IntegrationRule::GaussKonrod31)
             .compute()
-            .value
+            .map(|r| r.value)
     }
 
     fn s_gamma_integration_result(&mut self, n: f64) -> f64 {
@@ -283,7 +283,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             }
         } else {
             self.s_gamma_integral(gamma_minus_high, gamma_plus_high, n)
-        };
+        }.unwrap_or(f64::NAN);
 
         if result.is_nan() {
             0.
@@ -292,7 +292,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         }
     }
 
-    fn s_gamma_integral(&mut self, min: f64, max: f64, n: f64) -> f64 {
+    fn s_gamma_integral(&mut self, min: f64, max: f64, n: f64) -> gsl::GslResult<f64> {
         let mut ws = gsl::IntegrationWorkspace::new(5000);
 
         // TODO, maybe: disable GSL errors if nu/nu>c > 1e6 or observer_angle < 0.15
@@ -301,7 +301,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             .tolerance(0., 1e-3)
             .rule(gsl::IntegrationRule::GaussKonrod31)
             .compute()
-            .value
+            .map(|r| r.value)
     }
 
     fn s_polarization_term(&mut self, gamma: f64, n: f64) -> f64 {
@@ -371,11 +371,11 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
 
 
 // s_ prefix means this is a Symphony transcription
-fn s_normalize_f<D: DistributionFunction>(d: &mut D) -> f64 {
+fn s_normalize_f<D: DistributionFunction>(d: &mut D) -> gsl::GslResult<f64> {
     let mut ws = gsl::IntegrationWorkspace::new(1000);
 
     ws.qagiu(|x| d.calc_f_for_normalization(x), 1.)
         .tolerance(0., 1e-8)
         .compute()
-        .value
+        .map(|r| r.value)
 }
