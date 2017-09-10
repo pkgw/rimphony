@@ -33,7 +33,7 @@
 
 
 /* Compute `f_factor * exp(f_exp)` with some extra precision and safety. */
-static double
+static inline double
 exp_factor(const double f_factor, const double f_exp)
 {
     double fabs_exp;
@@ -62,6 +62,14 @@ exp_factor(const double f_factor, const double f_exp)
 
     /* Standard expression: */
     return f_factor * exp(f_exp);
+}
+
+
+/* Valid for x/n >> 1; leading order terms are O(1/x) */
+static inline double
+BesselJ_bigx(const double n, const double x)
+{
+    return sqrt(2. / (C_pi * x)) * cosl(x - 0.5 * C_pi * (n + 0.5));
 }
 
 
@@ -128,7 +136,6 @@ double my_Bessel_J( double n, double x )
   double BesselJ_Meissel_First(  double n, double x ) ;
   double BesselJ_Meissel_Second( double n, double x ) ;
   double BesselJ_Asympt1(        double n, double x);
-  double BesselJ_bigx(           double n , double x );
 
 //#if FLAG_N_JN == JN_C_LIB
   /* At least for GNU C Library, jn(n,x) requires n to be integer. */
@@ -369,18 +376,6 @@ double BesselJ_Asympt1( double n, double x)
   factor = 1./sqrt(2*C_pi*(n+1));
   exp_val = n*( 1 + log(0.5*z) );
   return( exp_factor( factor, exp_val ) );
-}
-
-/******************************************************************************************/
-/******************************************************************************************
-  BesselJ_bigx():
-  ---------------
-  -- valid for x/n >> 1
-  --  leading order terms are  O(1/x)
- ******************************************************************************************/
-double BesselJ_bigx( double n, double x)
-{
-  return(  sqrt(2./(C_pi*x)) * cosl( x - 0.5*C_pi*( n + 0.5 ) ) ) ;
 }
 
 /******************************************************************************************/
