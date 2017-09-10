@@ -32,6 +32,39 @@
 #define BESSEL_EPSILON_ORDER (16)
 
 
+/* Compute `f_factor * exp(f_exp)` with some extra precision and safety. */
+static double
+exp_factor(const double f_factor, const double f_exp)
+{
+    double fabs_exp;
+
+    if (f_factor == 0.)
+        return 0.;
+
+    fabs_exp = fabs(f_exp);
+
+    /* If small, use a 9th-order Taylor expansion of the exponent. */
+    if (fabs_exp < 1e-3) {
+        const double x = f_exp;
+        return f_factor *
+            (1 + ((40320 + (20160 + (6720 + (1680 + (336 + (56 + (8 + x) * x) * x) * x) * x) * x) * x) * x / 40320.));
+    }
+
+    /* We want to prevent overflows, calculate exponential wisely if we are close: */
+    if (fabs_exp > 690.) {
+        const double sign_f = (f_factor < 0) ? -1. : 1.;
+        const double log_f = log(fabs(f_factor));
+
+        if (log_f * f_exp < 0.)
+            return sign_f * exp(log_f + f_exp);
+        return f_factor * exp(f_exp);
+    }
+
+    /* Standard expression: */
+    return f_factor * exp(f_exp);
+}
+
+
 // Parameter for lines that deliminate between various approximations to J_n(x)
 //  ( values found empirically for n = 100..1e7 )
 #define SLOPE1 (-6.627757624078600696e-01)
@@ -41,8 +74,6 @@
 #define INTERCEPT2 (2.563324856985127465e-01)
 #define INTERCEPT3 (2.720161927383055733e-01)
 #define N_JN 	(30.)
-
-double exp_factor(  double f_factor, double f_exp )  ;
 
 /******************************************************************************************/
 /******************************************************************************************
@@ -353,50 +384,3 @@ double BesselJ_bigx( double n, double x)
 }
 
 /******************************************************************************************/
-/******************************************************************************************
-    exp_factor():
-    -----------------
-       -- given f_exp, and f_factor, returns with   f_factor * exp( f_exp ) ;
-
-       -- performs this calculation more accurately than the straightforward way;
-
-*******************************************************************************************/
-double exp_factor(  double f_factor, double f_exp )
-{
-  double log_f, sign_f, fabs_exp, x;
-
-  if( f_factor == 0. ) { return( 0. ); }
-
-  fabs_exp = fabs(f_exp);
-
-  /* If it is small, then use a 9th-order Taylor expansion of the exponent : */
-  if ( fabs_exp < 1.e-3 ) {
-    x = f_exp;
-    return(  f_factor
-             * ( 1. + ((40320.+(20160.+(6720.+(1680.+(336.+(56.+(8.+x)*x)*x)*x)*x)*x)*x)*x / 40320.) ) ) ;
-  }
-  /* We want to prevent overflows, calculate exponential wisely if we are close: */
-  else if( fabs_exp > 690. ) {
-    sign_f = ( f_factor < 0. ) ? -1. : 1. ;
-    log_f = log( fabs(f_factor)  );
-    if( log_f * f_exp < 0. ) {
-      return( sign_f * exp( log_f + f_exp ) );
-    }
-    else {
-      return( f_factor * exp( f_exp ) );
-    }
-  }
-  /* Standard expression: */
-  else {
-    return( f_factor * exp( f_exp ) );
-  }
-}
-
-#undef C_pi
-#undef BESSEL_EPSILON_ORDER
-#undef SLOPE1
-#undef SLOPE2
-#undef SLOPE3
-#undef INTERCEPT1
-#undef INTERCEPT2
-#undef INTERCEPT3
