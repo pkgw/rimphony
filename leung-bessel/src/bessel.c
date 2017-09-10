@@ -291,39 +291,34 @@ my_Bessel_J(const double n, const double x)
 }
 
 
-/******************************************************************************************/
-/******************************************************************************************
-   my_Bessel_dJ():
-   ----------------
+/* The swiss-army-knife Bessel derivative. It is based on the recurrence relation:
+ *
+ *   J_n'(x) = -J_{n+1}(x) + J_n(x)*(n/x)
+ *
+ * It would also be possible to use:
+ *
+ *   2 J_n'(x) = J_{n-1}(x) + J_{n+1}(x)
+ *
+ * But the current choice lets us avoid special-casing n = 0.
+ */
 
-  //#if FLAG_JNprime_EQ == JNprime_EQ1
-       -- returns the derivative of J_n(x) based on recurrence relation:
-
-            J_n'(x) = -J_{n+1}(x) + J_n(x)*(n/x)
-
-       -- I use this relation so we do not have to check for n=0 case.
-  //#elif FLAG_JNprime_EQ == JNprime_EQ2
-       -- returns the derivative of J_n(x) based on recurrence relation:
-
-            2 J_n'(x) = J_{n-1}(x) + J_{n+1}(x)
-  //#endif
-
-******************************************************************************************/
-double my_Bessel_dJ(double n, double x)
+double
+my_Bessel_dJ(const double n, const double x)
 {
-  double jnp1;
-  double my_Bessel_J(double n, double x);
-  double bessel_func;
+    const double jn = my_Bessel_J(n, x);
+    const double jnp1 = my_Bessel_J(n + 1, x);
 
-  bessel_func  = my_Bessel_J(n,   x);
-  jnp1 = my_Bessel_J((n+1), x);
+    if(x == 0.) {
+        /* J_n(0) = 0 for n >= 1; the recurrence relation gives a zero derivative for n >= 2 */
+        if (n >= 2.)
+            return 0.;
 
-  // **** problem: how about if n is between 0 and 1?
-  if(x == 0.) {
-    if(n >= 2.) return(0.); /* J_n(0) = 0 for n >= 1, then the recursive relation gives
-                             * a zero derivative for n >= 2 */
-    if(n == 0.) return(-jnp1); /* d(J_0(z))/dz = -J_1(z) */
-    return((n*bessel_func)/(x+DBL_MIN) - jnp1);
-  }
-  return(n*(bessel_func)/x - jnp1);
+        /* d(J_0(z))/dz = -J_1(z) */
+        if (n == 0.)
+            return -jnp1;
+
+        return n * jn / DBL_MIN - jnp1;
+    }
+
+    return n * jn / x - jnp1;
 }
