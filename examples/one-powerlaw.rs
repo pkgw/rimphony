@@ -23,5 +23,5 @@ fn main() {
         .finish(Coefficient::Emission(Stokes::I), NU, B, N_E, THETA)
         .compute();
 
-    println!("Symphony j_I: {}   Ours: {}", SYMPHONY_JI, ji);
+    println!("Symphony j_I: {:e}   Ours: {:e}", SYMPHONY_JI, ji);
 }
