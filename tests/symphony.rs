@@ -1,13 +1,17 @@
 /// Check our numbers against Symphony's.
+///
+/// This test suite compares against a random subset of a larger database of
+/// examples computed with Symphony; this is a compromise between converage
+/// and runtime.
 
 extern crate rand;
+extern crate regex;
 extern crate rimphony;
 
 use rimphony::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI, Coefficient, Stokes};
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::path::PathBuf;
-//use std::str::StrExt;
 
 const TOP: &'static str = env!("CARGO_MANIFEST_DIR");
 
@@ -23,6 +27,8 @@ fn compare_powerlaw_subset(coeff: rimphony::Coefficient, cname: &str, index: usi
     const GAMMA_MAX: f64 = 1000.;
     const GAMMA_CUTOFF: f64 = 1e7;
 
+    let re = regex::Regex::new(r"\s+").unwrap();
+
     let mut p = PathBuf::from(TOP);
     p.push("tests");
     p.push("symphony-powerlaw.txt");
@@ -34,7 +40,7 @@ fn compare_powerlaw_subset(coeff: rimphony::Coefficient, cname: &str, index: usi
             continue;
         }
 
-        let v: Vec<f64> = line.unwrap().split("\t").map(|s| s.parse::<f64>().unwrap()).collect();
+        let v: Vec<f64> = re.split(line.unwrap().as_ref()).map(|s| s.parse::<f64>().unwrap()).collect();
         let s = v[0];
         let theta = v[1];
         let p = v[2];
@@ -48,43 +54,43 @@ fn compare_powerlaw_subset(coeff: rimphony::Coefficient, cname: &str, index: usi
         let rel_err = ((ours - theirs) / theirs).abs();
 
         if rel_err > rtol {
-            panic!("disagree with Symphony for {}; they have {:.6e}, we have {:.6e}; at parameters:
+            panic!("disagree with Symphony for {}; they have {:.6e} , we have {:.6e}; at parameters:
 
-s: {:.6e}
-theta: {:.6e}
-p: {:.6e}", cname, theirs, ours, s, theta, p);
+s: {:.10e}
+theta: {:.10e}
+p: {:.10e}", cname, theirs, ours, s, theta, p);
         }
     }
 }
 
 #[test]
 fn compare_powerlaw_subset_ji() {
-    compare_powerlaw_subset(Coefficient::Emission(Stokes::I), "J_I", 3, 0.002, 1e-4);
+    compare_powerlaw_subset(Coefficient::Emission(Stokes::I), "J_I", 3, 0.03, 0.01);
 }
 
 #[test]
 fn compare_powerlaw_subset_jq() {
-    compare_powerlaw_subset(Coefficient::Emission(Stokes::Q), "J_Q", 5, 0.002, 1e-4);
+    compare_powerlaw_subset(Coefficient::Emission(Stokes::Q), "J_Q", 5, 0.03, 0.01);
 }
 
 /// Stokes V is a bit more demanding so the error threshold is looser.
 #[test]
 fn compare_powerlaw_subset_jv() {
-    compare_powerlaw_subset(Coefficient::Emission(Stokes::V), "J_V", 7, 0.002, 1e-3);
+    compare_powerlaw_subset(Coefficient::Emission(Stokes::V), "J_V", 7, 0.03, 0.01);
 }
 
 #[test]
 fn compare_powerlaw_subset_ai() {
-    compare_powerlaw_subset(Coefficient::Absorption(Stokes::I), "A_I", 4, 0.002, 1e-4);
+    compare_powerlaw_subset(Coefficient::Absorption(Stokes::I), "A_I", 4, 0.03, 0.01);
 }
 
 #[test]
 fn compare_powerlaw_subset_aq() {
-    compare_powerlaw_subset(Coefficient::Absorption(Stokes::Q), "A_Q", 6, 0.002, 1e-4);
+    compare_powerlaw_subset(Coefficient::Absorption(Stokes::Q), "A_Q", 6, 0.03, 0.01);
 }
 
 /// Stokes V is a bit more demanding so the error threshold is looser.
 #[test]
 fn compare_powerlaw_subset_av() {
-    compare_powerlaw_subset(Coefficient::Absorption(Stokes::V), "A_V", 8, 0.002, 1e-3);
+    compare_powerlaw_subset(Coefficient::Absorption(Stokes::V), "A_V", 8, 0.03, 0.01);
 }

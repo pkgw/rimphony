@@ -13,6 +13,7 @@ leung-bessel = { path = "leung-bessel" }
 [dev-dependencies]
 bencher = "^0.1"
 rand = "^0.3"
+regex = "^0.2"
 
 [[bench]]
 name = "powerlaw"
