@@ -237,6 +237,13 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         ans
     }
 
+    /// Compute the contributions to the integration from the region in the
+    /// n/gamma plane starting at `n_start` and extending to infinite `n`.
+    /// We use an adaptive algorithm that tackles the problem in chunks.
+    ///
+    /// Symphony had special code for the kappa distribution that identified
+    /// the most important `n` values analytically. We've removed the kappa
+    /// distribution so that code is gone too.
     fn n_integration(&mut self, mut n_start: f64) -> gsl::GslResult<f64> {
         let mut ans = 0_f64;
         let mut contrib = 0_f64;
@@ -245,43 +252,40 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         const DERIV_TOL: f64 = 1e-5;
         const TOLERANCE: f64 = 1e5;
 
+        let mut ws = gsl::IntegrationWorkspace::new(1000);
+
+        // At low harmonic numbers, step conservatively since every n counts.
+
         if self.nu / self.nu_c < 10. {
             delta_n = 1.;
             incr_step_factor = 2.;
         }
 
         while contrib.abs() >= (ans / TOLERANCE).abs() {
-            let deriv = self.s_derivative_of_n(n_start)?;
+            // Evaluate the derivative of the gamma integral with regards to n to figure out
+            // the size of the steps we should be taking.
+
+            let deriv = gsl::deriv_central(|n| self.s_gamma_integration_result(n), n_start, 1e-8)
+                .map(|r| r.value)?;
 
             if deriv.abs() < DERIV_TOL {
                 delta_n *= incr_step_factor;
             }
 
-            contrib = self.s_n_integral(n_start, n_start + delta_n)?;
+            // Compute the next chunk: the integral over all gammas between
+            // `n_start` and `n_start + delta_n`.
+
+            contrib = ws.qag(|n| self.s_gamma_integration_result(n), n_start, n_start + delta_n)
+                .tolerance(0., 1e-3)
+                .rule(gsl::IntegrationRule::GaussKonrod31)
+                .compute()
+                .map(|r| r.value)?;
+
             ans += contrib;
             n_start += delta_n;
         }
 
         Ok(ans)
-    }
-
-    fn s_derivative_of_n(&mut self, n_start: f64) -> gsl::GslResult<f64> {
-        /* from integrate.c */
-        gsl::deriv_central(|n| self.s_gamma_integration_result(n), n_start, 1e-8).map(|r| r.value)
-    }
-
-    fn s_n_integral(&mut self, min: f64, max: f64) -> gsl::GslResult<f64> {
-        /* from integrate.c */
-
-        let mut ws = gsl::IntegrationWorkspace::new(1000);
-
-        // TODO, maybe: disable GSL errors if nu/nu>c > 1e6 or observer_angle < 0.15
-
-        ws.qag(|n| self.s_gamma_integration_result(n), min, max)
-            .tolerance(0., 1e-3)
-            .rule(gsl::IntegrationRule::GaussKonrod31)
-            .compute()
-            .map(|r| r.value)
     }
 
     fn s_gamma_integration_result(&mut self, n: f64) -> f64 {
