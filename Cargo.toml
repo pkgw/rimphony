@@ -9,3 +9,6 @@ license = "MIT"
 [dependencies]
 gsl-sys = { path = "gsl-sys" }
 leung-bessel = { path = "leung-bessel" }
+
+[dev-dependencies]
+rand = "^0.3"
