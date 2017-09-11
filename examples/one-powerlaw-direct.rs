@@ -1,4 +1,5 @@
-/// Compute one coefficient for the power-law distribution.
+/// Compute one coefficient for the power-law distribution, using the same
+/// parameters that are fed directly into Symphony.
 
 extern crate rimphony;
 
@@ -10,10 +11,11 @@ fn main() {
     const N_E: f64 = 1.;
     const THETA: f64 = 0.9;
     const P: f64 = 2.5;
+    const SYMPHONY_JI: f64 = 2.64399749412774e-21;
+
     const GAMMA_MIN: f64 = 1.;
     const GAMMA_MAX: f64 = 1000.;
     const GAMMA_CUTOFF: f64 = 1e7;
-    const SYMPHONY_JI: f64 = 2.64399749412774e-21;
 
     let ji = rimphony::PowerLawDistribution::new(P)
         .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
