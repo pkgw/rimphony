@@ -295,19 +295,25 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
     fn s_gamma_integral(&mut self, min: f64, max: f64, n: f64) -> gsl::GslResult<f64> {
         let mut ws = gsl::IntegrationWorkspace::new(5000);
 
-        // TODO, maybe: disable GSL errors if nu/nu>c > 1e6 or observer_angle < 0.15
-
-        ws.qag(|g| self.s_gamma_integrand(g, n), min, max)
+        let r = ws.qag(|g| self.s_gamma_integrand(g, n), min, max)
             .tolerance(0., 1e-3)
             .rule(gsl::IntegrationRule::GaussKonrod31)
             .compute()
-            .map(|r| r.value)
+            .map(|r| r.value);
+
+        //if r.is_err() && (self.nu / self.nu_c > 1e6 || self.observer_angle < 0.15) {
+        //    Ok(0.)
+        //} else {
+        //    r
+        //}
+        //println!("GI {:.6e} {:.6e} {:.6e} {:.6e}", min, max, n, r.as_ref().unwrap_or(&-1.));
+        r
     }
 
     fn s_polarization_term(&mut self, gamma: f64, n: f64) -> f64 {
         /* from integrands.c */
         let beta = (1. - 1. / (gamma * gamma)).sqrt();
-        let cos_xi = (gamma * self.nu - n * self.nu_c) / (gamma * self.nu * beta) * self.observer_angle.sin();
+        let cos_xi = (gamma * self.nu - n * self.nu_c) / (gamma * self.nu * beta * self.observer_angle.cos());
         let m = (self.observer_angle.cos() - beta * cos_xi) / self.observer_angle.sin();
         let big_n = beta * (1. - cos_xi * cos_xi).sqrt();
         let z = self.nu * gamma * beta * self.observer_angle.sin() * (1. - cos_xi * cos_xi).sqrt() / self.nu_c;
