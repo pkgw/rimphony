@@ -1,3 +1,17 @@
+/*! Calculate radiative transfer coefficients for synchrotron emission.
+
+This crate is a Rust port of
+[symphony](https://github.com/AFD-Illinois/symphony), a synchrotron code
+written in C that is primarily the work of Alex Pandya and the group of
+Charles Gammie at the University of Illinois. This port attempts to clean
+up the code to make it a bit easier to experiment with. The key
+publications are [Pandya, Zhang, Chandra, and Gammie (2016;
+DOI:10.3847/0004-637X/822/1/34](https://dx.doi.org/10.3847/0004-637X/822/1/34)
+and [Leung, Gammie, and Noble
+(2011)](https://dx.doi.org/10.1088/0004-637X/737/1/21).
+
+*/
+
 extern crate gsl_sys;
 extern crate leung_bessel;
 
@@ -14,19 +28,34 @@ pub const PLANCKS_CONSTANT: f64 = 6.6260693e-27;
 pub const N_MAX: f64 = 30.;
 
 
-/// There's no "U" option because our linear polarization basis is defined
-/// such that all U terms are zero.
+/// Which Stokes parameter we are analyzing. There's no "U" option because our
+/// linear polarization basis is defined such that all U terms are zero; one
+/// can fairly easily rotate these parameters into a fixed frame if the
+/// magnetic field rotates over the line of sight.
 #[derive(Copy,Clone,Debug,Eq,Hash,PartialEq)]
 pub enum Stokes {
+    /// The total intensity.
     I,
+
+    /// The linear polarization.
     Q,
+
+    /// The circular polarization. The sign convention aspires to agree with
+    /// the IEEE/IAU convention, where `V = RCP - LCP` and RCP means that the
+    /// electric field rotates clockwise as seen from the transmitter. Sign
+    /// errors in Stokes V are endemic.
     V
 }
 
 
+/// Which radiative transfer coefficient to compute.
 #[derive(Copy,Clone,Debug,Eq,Hash,PartialEq)]
 pub enum Coefficient {
+    /// The emission cofficient, in units of ergs per second per square
+    /// centimeter per Hertz per steradian.
     Emission(Stokes),
+
+    /// The absorption coefficient, in units of inverse centimeters.
     Absorption(Stokes),
 }
 
