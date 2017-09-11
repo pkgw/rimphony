@@ -193,15 +193,13 @@ impl DistributionFunction for SynchrotronCalculator<PowerLawDistribution> {
 
 impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
     pub fn compute(&mut self) -> f64 {
-        self.s_n_summation()
-    }
-
-    fn s_n_summation(&mut self) -> f64 {
-        /* from integrate.c */
+        // This function used to be "n_summation" in symphony's integrate.c.
 
         let mut ans = 0_f64;
 
         self.nu_c = ELECTRON_CHARGE * self.magnetic_field / (TWO_PI * MASS_ELECTRON * SPEED_LIGHT);
+
+        // Calculate the contributions from the first 30 n's discretely.
 
         let n_minus = (self.nu / self.nu_c) * self.observer_angle.sin().abs();
 
@@ -211,9 +209,16 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             ans += self.s_gamma_integration_result(n as f64);
         }
 
+        // Now integrate the remaining n's, pretending that n can assume any
+        // real value. Stokes V is hard to resolve, so if we're computing it,
+        // we split the integrals into two lobes and add the results together
+        // (see n_integration). We're a bit sloppy about the integration so if
+        // it results in a NAN error, just ignore it.
+
         self.stokes_v_switch = StokesVSwitch::PositiveLobe;
 
-        let n_integral_contrib = self.s_n_integration(n_minus).unwrap_or(f64::NAN);
+        let n_start = (n_minus + 1. + N_MAX).floor();
+        let n_integral_contrib = self.n_integration(n_start).unwrap_or(f64::NAN);
 
         if !n_integral_contrib.is_nan() {
             ans += n_integral_contrib;
@@ -221,19 +226,18 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
 
         if self.coeff.stokes() == Stokes::V {
             self.stokes_v_switch = StokesVSwitch::NegativeLobe;
-            let n_integral_contrib = self.s_n_integration(n_minus).unwrap_or(f64::NAN);
+            let n_integral_contrib = self.n_integration(n_start).unwrap_or(f64::NAN);
             if !n_integral_contrib.is_nan() {
                 ans += n_integral_contrib;
             }
         }
 
+        // And that's it.
+
         ans
     }
 
-    fn s_n_integration(&mut self, n_minus: f64) -> gsl::GslResult<f64> {
-        /* from integrate.c */
-
-        let mut n_start = (N_MAX + n_minus + 1.).floor();
+    fn n_integration(&mut self, mut n_start: f64) -> gsl::GslResult<f64> {
         let mut ans = 0_f64;
         let mut contrib = 0_f64;
         let mut delta_n = 1e5_f64;
