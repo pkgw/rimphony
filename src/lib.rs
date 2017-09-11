@@ -127,6 +127,10 @@ pub trait DistributionFunction {
 
 impl DistributionFunction for SynchrotronCalculator<PowerLawDistribution> {
     fn calc_f(&mut self, gamma: f64) -> f64 {
+        if gamma < self.d.gamma_min || gamma > self.d.gamma_max {
+            return 0.;
+        }
+
         let norm = if let Some(n) = self.d.norm {
             n
         } else {
@@ -146,6 +150,10 @@ impl DistributionFunction for SynchrotronCalculator<PowerLawDistribution> {
     }
 
     fn calc_f_for_normalization(&mut self, gamma: f64) -> f64 {
+        if gamma < self.d.gamma_min || gamma > self.d.gamma_max {
+            return 0.;
+        }
+
         let norm_term = 4. * PI;
         let prefactor = (self.d.p - 1.) / (self.d.gamma_min.powf(1. - self.d.p) - self.d.gamma_max.powf(1. - self.d.p));
         let body = gamma.powf(-self.d.p) * (-gamma / self.d.gamma_cutoff).exp();
