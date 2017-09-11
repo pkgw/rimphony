@@ -340,12 +340,18 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         let prefactor = TWO_PI * self.nu / (MASS_ELECTRON * SPEED_LIGHT * SPEED_LIGHT) *
             GYROPHASE_INDEP * D3P_TO_GAMMA;
 
-        let df = if self.calc_f(gamma + EPSILON).is_nan() {
+        let f_plus = self.calc_f(gamma + EPSILON);
+
+        let df = if f_plus.is_nan() {
             (self.calc_f(gamma) - self.calc_f(gamma - EPSILON)) / EPSILON
-        } else if self.calc_f(gamma - EPSILON).is_nan() {
-            (self.calc_f(gamma + EPSILON) - self.calc_f(gamma)) / EPSILON
         } else {
-            (self.calc_f(gamma + EPSILON) - self.calc_f(gamma - EPSILON)) / (2. * EPSILON)
+            let f_minus = self.calc_f(gamma - EPSILON);
+
+            if f_minus.is_nan() {
+                (f_plus - self.calc_f(gamma)) / EPSILON
+            } else {
+                (f_plus - f_minus) / (2. * EPSILON)
+            }
         };
 
         prefactor * df
