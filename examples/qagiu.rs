@@ -7,7 +7,8 @@ fn main() {
 
     let r = ws.qagiu(|x| { 1. / (x * x) }, 0.5)
         .tolerance(0., 1e-6)
-        .compute();
+        .compute()
+        .unwrap();
 
     println!("Result: {}   Abs err: {}", r.value, r.abserr);
 }
