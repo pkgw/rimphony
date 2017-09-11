@@ -11,7 +11,7 @@ fn main() {
     const THETA: f64 = 1.381850e0;
     const P: f64 = 2.394880e0;
     const COEFF: Coefficient = Coefficient::Emission(Stokes::I);
-    const SYMPHONY_JI: f64 = 1.948830e-30;
+    const SYMPHONY_JI: f64 = 1.3415653497801385e-30;
 
     const NU: f64 = 1e9;
     const B: f64 = TWO_PI * MASS_ELECTRON * SPEED_LIGHT * NU / (ELECTRON_CHARGE * S);
