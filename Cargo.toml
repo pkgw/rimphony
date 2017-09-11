@@ -11,4 +11,9 @@ gsl-sys = { path = "gsl-sys" }
 leung-bessel = { path = "leung-bessel" }
 
 [dev-dependencies]
+bencher = "^0.1"
 rand = "^0.3"
+
+[[bench]]
+name = "powerlaw"
+harness = false
