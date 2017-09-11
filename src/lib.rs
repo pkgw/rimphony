@@ -206,7 +206,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         self.stokes_v_switch = StokesVSwitch::Inactive;
 
         for n in ((n_minus + 1.) as i64)..((n_minus + 1. + N_MAX) as i64) {
-            ans += self.s_gamma_integration_result(n as f64);
+            ans += self.gamma_integral(n as f64);
         }
 
         // Now integrate the remaining n's, pretending that n can assume any
@@ -265,7 +265,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             // Evaluate the derivative of the gamma integral with regards to n to figure out
             // the size of the steps we should be taking.
 
-            let deriv = gsl::deriv_central(|n| self.s_gamma_integration_result(n), n_start, 1e-8)
+            let deriv = gsl::deriv_central(|n| self.gamma_integral(n), n_start, 1e-8)
                 .map(|r| r.value)?;
 
             if deriv.abs() < DERIV_TOL {
@@ -275,7 +275,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             // Compute the next chunk: the integral over all gammas between
             // `n_start` and `n_start + delta_n`.
 
-            contrib = ws.qag(|n| self.s_gamma_integration_result(n), n_start, n_start + delta_n)
+            contrib = ws.qag(|n| self.gamma_integral(n), n_start, n_start + delta_n)
                 .tolerance(0., 1e-3)
                 .rule(gsl::IntegrationRule::GaussKonrod31)
                 .compute()
@@ -288,8 +288,8 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         Ok(ans)
     }
 
-    fn s_gamma_integration_result(&mut self, n: f64) -> f64 {
-        /* from integrate.c */
+    fn gamma_integral(&mut self, n: f64) -> f64 {
+        /* Formerly `gamma_integration_result` from Symphony's integrate.c */
 
         let gamma_minus = ((n * self.nu_c) / self.nu -
                            self.observer_angle.cos().abs() *
@@ -318,16 +318,13 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         let gamma_plus_high = gamma_peak - (gamma_peak - gamma_plus) / width;
 
         let result = if self.coeff.stokes() == Stokes::V && self.stokes_v_switch != StokesVSwitch::Inactive {
-            let neg_result = self.s_gamma_integral(gamma_minus_high, gamma_peak, n);
-            let pos_result = self.s_gamma_integral(gamma_peak, gamma_plus_high, n);
-
             if self.stokes_v_switch == StokesVSwitch::PositiveLobe {
-                pos_result
+                self._gamma_integral_inner(gamma_peak, gamma_plus_high, n)
             } else {
-                neg_result
+                self._gamma_integral_inner(gamma_minus_high, gamma_peak, n)
             }
         } else {
-            self.s_gamma_integral(gamma_minus_high, gamma_plus_high, n)
+            self._gamma_integral_inner(gamma_minus_high, gamma_plus_high, n)
         }.unwrap_or(f64::NAN);
 
         if result.is_nan() {
@@ -337,7 +334,9 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         }
     }
 
-    fn s_gamma_integral(&mut self, min: f64, max: f64, n: f64) -> gsl::GslResult<f64> {
+    #[inline]
+    fn _gamma_integral_inner(&mut self, min: f64, max: f64, n: f64) -> gsl::GslResult<f64> {
+        // Formerly `gamma_integral` in Symphony's integrate.c 
         let mut ws = gsl::IntegrationWorkspace::new(5000);
 
         let r = ws.qag(|g| self.s_gamma_integrand(g, n), min, max)
