@@ -320,10 +320,14 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         let k_xx = m * m * leung_bessel::Jn(n, z).powi(2);
         let k_yy = big_n * big_n * leung_bessel::Jn_prime(n, z).powi(2);
 
+        // NOTE: Leung et al. (2011) has the wrong sign for Stokes V in its
+        // equations, where "wrong" means "not the IEEE/IAU convention". We do
+        // it right below.
+
         match self.coeff.stokes() {
             Stokes::I => k_xx + k_yy,
             Stokes::Q => k_xx - k_yy,
-            Stokes::V => -2. * m * big_n * leung_bessel::Jn(n, z) * leung_bessel::Jn_prime(n, z),
+            Stokes::V => 2. * m * big_n * leung_bessel::Jn(n, z) * leung_bessel::Jn_prime(n, z),
         }
     }
 
