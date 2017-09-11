@@ -204,9 +204,10 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         let n_minus = (self.nu / self.nu_c) * self.observer_angle.sin().abs();
 
         self.stokes_v_switch = StokesVSwitch::Inactive;
+        let mut gamma_workspace = gsl::IntegrationWorkspace::new(5000);
 
         for n in ((n_minus + 1.) as i64)..((n_minus + 1. + N_MAX) as i64) {
-            ans += self.gamma_integral(n as f64);
+            ans += self.gamma_integral(&mut gamma_workspace, n as f64);
         }
 
         // Now integrate the remaining n's, pretending that n can assume any
@@ -252,7 +253,8 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         const DERIV_TOL: f64 = 1e-5;
         const TOLERANCE: f64 = 1e5;
 
-        let mut ws = gsl::IntegrationWorkspace::new(1000);
+        let mut n_workspace = gsl::IntegrationWorkspace::new(1000);
+        let mut gamma_workspace = gsl::IntegrationWorkspace::new(5000);
 
         // At low harmonic numbers, step conservatively since every n counts.
 
@@ -265,7 +267,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             // Evaluate the derivative of the gamma integral with regards to n to figure out
             // the size of the steps we should be taking.
 
-            let deriv = gsl::deriv_central(|n| self.gamma_integral(n), n_start, 1e-8)
+            let deriv = gsl::deriv_central(|n| self.gamma_integral(&mut gamma_workspace, n), n_start, 1e-8)
                 .map(|r| r.value)?;
 
             if deriv.abs() < DERIV_TOL {
@@ -275,7 +277,8 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             // Compute the next chunk: the integral over all gammas between
             // `n_start` and `n_start + delta_n`.
 
-            contrib = ws.qag(|n| self.gamma_integral(n), n_start, n_start + delta_n)
+            contrib = n_workspace.qag(|n| self.gamma_integral(&mut gamma_workspace, n),
+                                      n_start, n_start + delta_n)
                 .tolerance(0., 1e-3)
                 .rule(gsl::IntegrationRule::GaussKonrod31)
                 .compute()
@@ -288,7 +291,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         Ok(ans)
     }
 
-    fn gamma_integral(&mut self, n: f64) -> f64 {
+    fn gamma_integral(&mut self, workspace: &mut gsl::IntegrationWorkspace, n: f64) -> f64 {
         /* Formerly `gamma_integration_result` from Symphony's integrate.c */
 
         let gamma_minus = ((n * self.nu_c) / self.nu -
@@ -317,41 +320,36 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         let gamma_minus_high = gamma_peak - (gamma_peak - gamma_minus) / width;
         let gamma_plus_high = gamma_peak - (gamma_peak - gamma_plus) / width;
 
-        let result = if self.coeff.stokes() == Stokes::V && self.stokes_v_switch != StokesVSwitch::Inactive {
+        if self.coeff.stokes() == Stokes::V && self.stokes_v_switch != StokesVSwitch::Inactive {
             if self.stokes_v_switch == StokesVSwitch::PositiveLobe {
-                self._gamma_integral_inner(gamma_peak, gamma_plus_high, n)
+                self._gamma_integral_inner(workspace, gamma_peak, gamma_plus_high, n)
             } else {
-                self._gamma_integral_inner(gamma_minus_high, gamma_peak, n)
+                self._gamma_integral_inner(workspace, gamma_minus_high, gamma_peak, n)
             }
         } else {
-            self._gamma_integral_inner(gamma_minus_high, gamma_plus_high, n)
-        }.unwrap_or(f64::NAN);
-
-        if result.is_nan() {
-            0.
-        } else {
-            result
+            self._gamma_integral_inner(workspace, gamma_minus_high, gamma_plus_high, n)
         }
     }
 
     #[inline]
-    fn _gamma_integral_inner(&mut self, min: f64, max: f64, n: f64) -> gsl::GslResult<f64> {
-        // Formerly `gamma_integral` in Symphony's integrate.c 
-        let mut ws = gsl::IntegrationWorkspace::new(5000);
+    fn _gamma_integral_inner(&mut self, workspace: &mut gsl::IntegrationWorkspace,
+                             min: f64, max: f64, n: f64) -> f64 {
+        // Formerly `gamma_integral` in Symphony's integrate.c
+        //
+        // In Symphony this function had code to avoid aborts if GSL failed to
+        // integrate if the harmonic number was high or the observer angle was
+        // low. We properly handle errors so we should never abort. Our policy
+        // then becomes more generous: we ignore failures and use zeros
+        // instead on *any* failure, not just ones in certain regions of
+        // parameter space. In Symphony, failures in those regions would lead
+        // to aborts.
 
-        let r = ws.qag(|g| self.s_gamma_integrand(g, n), min, max)
+        workspace.qag(|g| self.s_gamma_integrand(g, n), min, max)
             .tolerance(0., 1e-3)
             .rule(gsl::IntegrationRule::GaussKonrod31)
             .compute()
-            .map(|r| r.value);
-
-        //if r.is_err() && (self.nu / self.nu_c > 1e6 || self.observer_angle < 0.15) {
-        //    Ok(0.)
-        //} else {
-        //    r
-        //}
-        //println!("GI {:.6e} {:.6e} {:.6e} {:.6e}", min, max, n, r.as_ref().unwrap_or(&-1.));
-        r
+            .map(|r| r.value)
+            .unwrap_or(0.)
     }
 
     fn s_polarization_term(&mut self, gamma: f64, n: f64) -> f64 {
