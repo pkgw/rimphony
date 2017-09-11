@@ -163,7 +163,7 @@ impl DistributionFunction for SynchrotronCalculator<PowerLawDistribution> {
         let norm = if let Some(n) = self.d.norm {
             n
         } else {
-            let n = 1. / s_normalize_f(self).unwrap();
+            let n = 1. / self.s_normalize_f().unwrap();
             self.d.norm = Some(n);
             n
         };
@@ -420,15 +420,14 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             0.
         }
     }
-}
 
 
-// s_ prefix means this is a Symphony transcription
-fn s_normalize_f<D: DistributionFunction>(d: &mut D) -> gsl::GslResult<f64> {
-    let mut ws = gsl::IntegrationWorkspace::new(1000);
+    fn s_normalize_f(&mut self) -> gsl::GslResult<f64> {
+        let mut ws = gsl::IntegrationWorkspace::new(1000);
 
-    ws.qagiu(|x| d.calc_f_for_normalization(x), 1.)
-        .tolerance(0., 1e-8)
-        .compute()
-        .map(|r| r.value)
+        ws.qagiu(|x| self.calc_f_for_normalization(x), 1.)
+            .tolerance(0., 1e-8)
+            .compute()
+            .map(|r| r.value)
+    }
 }
