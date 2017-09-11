@@ -163,7 +163,7 @@ impl DistributionFunction for SynchrotronCalculator<PowerLawDistribution> {
         let norm = if let Some(n) = self.d.norm {
             n
         } else {
-            let n = 1. / self.s_normalize_f().unwrap();
+            let n = 1. / self.normalize_f().unwrap();
             self.d.norm = Some(n);
             n
         };
@@ -344,7 +344,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         // parameter space. In Symphony, failures in those regions would lead
         // to aborts.
 
-        workspace.qag(|g| self.s_gamma_integrand(g, n), min, max)
+        workspace.qag(|g| self.gamma_integrand(g, n), min, max)
             .tolerance(0., 1e-3)
             .rule(gsl::IntegrationRule::GaussKonrod31)
             .compute()
@@ -352,7 +352,35 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             .unwrap_or(0.)
     }
 
-    fn s_polarization_term(&mut self, gamma: f64, n: f64) -> f64 {
+    fn gamma_integrand(&mut self, gamma: f64, n: f64) -> f64 {
+        /* from integrands.c */
+
+        let beta = (1. - 1. / (gamma * gamma)).sqrt();
+
+        let ans = match self.coeff {
+            Coefficient::Emission(_) => {
+                let func_i = TWO_PI * (ELECTRON_CHARGE * self.nu).powi(2) / SPEED_LIGHT
+                    * (MASS_ELECTRON * SPEED_LIGHT).powi(3) * gamma * gamma * beta * TWO_PI
+                    * self.calc_f(gamma) * self.polarization_term(gamma, n);
+                let prefactor = 1. / (self.nu * beta * self.observer_angle.cos().abs());
+                prefactor * func_i
+            },
+            Coefficient::Absorption(_) => {
+                let prefactor = -SPEED_LIGHT * ELECTRON_CHARGE * ELECTRON_CHARGE / (2. * self.nu);
+                prefactor * gamma * gamma * beta * self.numerical_differential_of_f(gamma) *
+                    self.polarization_term(gamma, n) / (self.nu * beta * self.observer_angle.cos().abs())
+            }
+        };
+
+        if ans.is_finite() {
+            ans
+        } else {
+            0.
+        }
+    }
+
+    #[inline]
+    fn polarization_term(&mut self, gamma: f64, n: f64) -> f64 {
         /* from integrands.c */
         let beta = (1. - 1. / (gamma * gamma)).sqrt();
         let cos_xi = (gamma * self.nu - n * self.nu_c) / (gamma * self.nu * beta * self.observer_angle.cos());
@@ -373,7 +401,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         }
     }
 
-    fn s_numerical_differential_of_f(&mut self, gamma: f64) -> f64 {
+    fn numerical_differential_of_f(&mut self, gamma: f64) -> f64 {
         /* from distribution_function_common_routines.c */
         const EPSILON: f64 = 3e-4;
         const GYROPHASE_INDEP: f64 = TWO_PI;
@@ -399,35 +427,8 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         prefactor * df
     }
 
-    fn s_gamma_integrand(&mut self, gamma: f64, n: f64) -> f64 {
-        /* from integrands.c */
-
-        let beta = (1. - 1. / (gamma * gamma)).sqrt();
-
-        let ans = match self.coeff {
-            Coefficient::Emission(_) => {
-                let func_i = TWO_PI * (ELECTRON_CHARGE * self.nu).powi(2) / SPEED_LIGHT
-                    * (MASS_ELECTRON * SPEED_LIGHT).powi(3) * gamma * gamma * beta * TWO_PI
-                    * self.calc_f(gamma) * self.s_polarization_term(gamma, n);
-                let prefactor = 1. / (self.nu * beta * self.observer_angle.cos().abs());
-                prefactor * func_i
-            },
-            Coefficient::Absorption(_) => {
-                let prefactor = -SPEED_LIGHT * ELECTRON_CHARGE * ELECTRON_CHARGE / (2. * self.nu);
-                prefactor * gamma * gamma * beta * self.s_numerical_differential_of_f(gamma) *
-                    self.s_polarization_term(gamma, n) / (self.nu * beta * self.observer_angle.cos().abs())
-            }
-        };
-
-        if ans.is_finite() {
-            ans
-        } else {
-            0.
-        }
-    }
-
-
-    fn s_normalize_f(&mut self) -> gsl::GslResult<f64> {
+    /// A generic helper that the distribution functions can use.
+    fn normalize_f(&mut self) -> gsl::GslResult<f64> {
         let mut ws = gsl::IntegrationWorkspace::new(1000);
 
         ws.qagiu(|x| self.calc_f_for_normalization(x), 1.)
