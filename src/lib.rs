@@ -18,20 +18,31 @@ continous.
 
 */
 
+#![deny(missing_docs)]
+
 extern crate gsl_sys;
 extern crate leung_bessel;
 
 use std::f64;
 
-pub mod gsl;
+mod gsl;
 
 pub use f64::consts::PI;
+
+/// Two times pi, as an `f64`.
 pub const TWO_PI: f64 = 2. * PI;
+
+/// The mass of the electron in cgs (grams).
 pub const MASS_ELECTRON: f64 = 9.1093826e-28;
+
+/// The speed of light in cgs (centimeters per second).
 pub const SPEED_LIGHT: f64 = 2.99792458e10;
+
+/// The charge of the electron, in cgs (esu's).
 pub const ELECTRON_CHARGE: f64 = 4.80320680e-10;
-pub const PLANCKS_CONSTANT: f64 = 6.6260693e-27;
-pub const N_MAX: f64 = 30.;
+
+
+const N_MAX: f64 = 30.;
 
 
 /// Which Stokes parameter we are analyzing. There's no "U" option because our

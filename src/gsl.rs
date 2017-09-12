@@ -75,6 +75,7 @@ pub struct IntegrationResult {
 
 // This enum is unnamed in GSL so I'm not sure how to get bindgen to pick it up.
 #[derive(Clone,Copy,Debug,Eq,PartialEq)]
+#[allow(dead_code)]
 pub enum IntegrationRule {
     GaussKonrod15 = 1,
     GaussKonrod21 = 2,
@@ -86,6 +87,7 @@ pub enum IntegrationRule {
 
 
 #[derive(Clone,Copy,Debug,Eq,PartialEq)]
+#[allow(dead_code)]
 pub enum Integrator {
     QAG,
     QAGIU,
@@ -188,6 +190,7 @@ impl<'a, F: 'a> IntegrationBuilder<'a, F> where F: FnMut(f64) -> f64 {
 
 
 impl IntegrationWorkspace {
+    #[allow(dead_code)]
     pub fn qagiu<'a, F>(&'a mut self, f: F, lower_bound: f64) -> IntegrationBuilder<'a, F> where F: FnMut(f64) -> f64 {
         IntegrationBuilder::new(self, f, Integrator::QAGIU, lower_bound, f64::NAN)
     }

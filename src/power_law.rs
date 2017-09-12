@@ -14,6 +14,8 @@ use gsl;
 use super::{TWO_PI, DistributionFunction, FullSynchrotronCalculator};
 
 
+/// Parameters for a power-law electron distribution. See the module-level
+/// documentation for details.
 pub struct PowerLawDistribution {
     p: f64,
     gamma_min: f64,
@@ -53,6 +55,11 @@ impl DistributionFunction for PowerLawDistribution {
 
 
 impl PowerLawDistribution {
+    /// Create a new set of power-law parameters with the specified power-law
+    /// index.
+    ///
+    /// The default gamma limits are a minimum of 1, a maximum of 10^12, and a
+    /// cutoff at 10^10.
     pub fn new(p: f64) -> Self {
         PowerLawDistribution {
             p: p,
@@ -63,6 +70,7 @@ impl PowerLawDistribution {
         }
     }
 
+    /// Alter the gamma integration limits of this distribution.
     pub fn gamma_limits(mut self, gamma_min: f64, gamma_max: f64, gamma_cutoff: f64) -> Self {
         self.gamma_min = gamma_min;
         self.gamma_max = gamma_max;
@@ -70,6 +78,9 @@ impl PowerLawDistribution {
         self
     }
 
+    /// Create a SynchrotronCalculator from this set of paramaters. The
+    /// calculator will use the full, detailed double integral calculation to
+    /// evaluate all coefficients.
     pub fn full_calculation(mut self) -> FullSynchrotronCalculator<Self> {
         // Compute the normalization factor.
 
