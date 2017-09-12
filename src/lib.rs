@@ -113,15 +113,16 @@ impl PowerLawDistribution {
     }
 
     pub fn finish(self, coeff: Coefficient, nu: f64, b: f64, n_e: f64, theta: f64) -> SynchrotronCalculator<Self> {
+        let nu_c = ELECTRON_CHARGE * b / (TWO_PI * MASS_ELECTRON * SPEED_LIGHT);
+
         SynchrotronCalculator {
             coeff: coeff,
             nu: nu,
-            magnetic_field: b,
+            s: nu / nu_c,
             electron_density: n_e,
             cos_observer_angle: theta.cos(),
             sin_observer_angle: theta.sin(),
             d: self,
-            nu_c: f64::NAN,
             stokes_v_switch: StokesVSwitch::Inactive,
         }
     }
@@ -139,14 +140,13 @@ enum StokesVSwitch {
 pub struct SynchrotronCalculator<D> {
     coeff: Coefficient,
     nu: f64,
-    magnetic_field: f64,
+    s: f64,
     electron_density: f64,
     cos_observer_angle: f64,
     sin_observer_angle: f64,
 
     d: D,
 
-    nu_c: f64,
     stokes_v_switch: StokesVSwitch,
 }
 
@@ -205,11 +205,9 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
 
         let mut ans = 0_f64;
 
-        self.nu_c = ELECTRON_CHARGE * self.magnetic_field / (TWO_PI * MASS_ELECTRON * SPEED_LIGHT);
-
         // Calculate the contributions from the first 30 n's discretely.
 
-        let n_minus = (self.nu / self.nu_c) * self.sin_observer_angle.abs();
+        let n_minus = self.s * self.sin_observer_angle.abs();
 
         self.stokes_v_switch = StokesVSwitch::Inactive;
         let mut gamma_workspace = gsl::IntegrationWorkspace::new(5000);
@@ -266,7 +264,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
 
         // At low harmonic numbers, step conservatively since every n counts.
 
-        if self.nu / self.nu_c < 10. {
+        if self.s < 10. {
             delta_n = 1.;
             incr_step_factor = 2.;
         }
@@ -305,14 +303,14 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
     fn gamma_integral(&mut self, workspace: &mut gsl::IntegrationWorkspace, n: f64) -> f64 {
         /* Formerly `gamma_integration_result` from Symphony's integrate.c */
 
-        let gamma_minus = ((n * self.nu_c) / self.nu -
+        let gamma_minus = (n / self.s -
                            self.cos_observer_angle.abs() *
-                           ((n * self.nu_c / self.nu).powi(2) - self.sin_observer_angle.powi(2)).sqrt()
+                           ((n / self.s).powi(2) - self.sin_observer_angle.powi(2)).sqrt()
         ) / self.sin_observer_angle.powi(2);
 
-        let gamma_plus = ((n * self.nu_c) / self.nu +
+        let gamma_plus = (n / self.s +
                            self.cos_observer_angle.abs() *
-                           ((n * self.nu_c / self.nu).powi(2) - self.sin_observer_angle.powi(2)).sqrt()
+                           ((n / self.s).powi(2) - self.sin_observer_angle.powi(2)).sqrt()
         ) / self.sin_observer_angle.powi(2);
 
         let gamma_peak = 0.5 * (gamma_plus + gamma_minus);
@@ -320,9 +318,9 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         const NU_HIGH: f64 = 3e8;
         const NU_LOW: f64 = 1e6;
 
-        let width = if self.nu / self.nu_c > NU_HIGH {
+        let width = if self.s > NU_HIGH {
             1000.
-        } else if self.nu / self.nu_c > NU_LOW {
+        } else if self.s > NU_LOW {
             10.
         } else {
             1.
@@ -373,10 +371,10 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         // convention". We do it right below.
 
         let beta = (1. - 1. / (gamma * gamma)).sqrt();
-        let cos_xi = (gamma * self.nu - n * self.nu_c) / (gamma * self.nu * beta * self.cos_observer_angle);
+        let cos_xi = (gamma - n / self.s) / (gamma * beta * self.cos_observer_angle);
         let m = (self.cos_observer_angle - beta * cos_xi) / self.sin_observer_angle;
         let big_n = beta * (1. - cos_xi * cos_xi).sqrt();
-        let z = self.nu * gamma * beta * self.sin_observer_angle * (1. - cos_xi * cos_xi).sqrt() / self.nu_c;
+        let z = self.s * gamma * beta * self.sin_observer_angle * (1. - cos_xi * cos_xi).sqrt();
         let k_xx = m * m * leung_bessel::Jn(n, z).powi(2);
         let k_yy = big_n * big_n * leung_bessel::Jn_prime(n, z).powi(2);
 
