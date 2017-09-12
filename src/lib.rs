@@ -42,9 +42,6 @@ pub const SPEED_LIGHT: f64 = 2.99792458e10;
 pub const ELECTRON_CHARGE: f64 = 4.80320680e-10;
 
 
-const N_MAX: f64 = 30.;
-
-
 /// Which Stokes parameter we are analyzing. There's no "U" option because our
 /// linear polarization basis is defined such that all U terms are zero; one
 /// can fairly easily rotate these parameters into a fixed frame if the
@@ -198,6 +195,8 @@ impl<D: DistributionFunction> SynchrotronCalculator for FullSynchrotronCalculato
 
 impl<'a, D: 'a + DistributionFunction> FullCalculationState<'a, D> {
     fn compute(&mut self) -> f64 {
+        const N_MAX: f64 = 30.;
+
         // This function used to be "n_summation" in symphony's integrate.c.
 
         let mut ans = 0_f64;
