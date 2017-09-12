@@ -7,11 +7,11 @@ extern crate rimphony;
 use rimphony::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI, Coefficient, Stokes};
 
 fn main() {
-    const S: f64 = 5.476500e5;
-    const THETA: f64 = 1.381850e0;
-    const P: f64 = 2.394880e0;
-    const COEFF: Coefficient = Coefficient::Emission(Stokes::I);
-    const SYMPHONY_VAL: f64 = 1.3415653497801385e-30;
+    const S: f64 = 1.3136507771e2;
+    const THETA: f64 = 8.7361125358e-1;
+    const P: f64 = 1.5498441750e0;
+    const COEFF: Coefficient = Coefficient::Absorption(Stokes::I);
+    const SYMPHONY_VAL: f64 = 9.286451e-16;
 
     const NU: f64 = 1e9;
     const B: f64 = TWO_PI * MASS_ELECTRON * SPEED_LIGHT * NU / (ELECTRON_CHARGE * S);

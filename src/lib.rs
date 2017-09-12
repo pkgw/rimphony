@@ -85,7 +85,7 @@ pub struct PowerLawDistribution {
     gamma_max: f64,
     gamma_cutoff: f64,
 
-    norm: Option<f64>,
+    norm: f64,
 }
 
 
@@ -96,30 +96,38 @@ impl PowerLawDistribution {
             gamma_min: 1.,
             gamma_max: 1000.,
             gamma_cutoff: 1e7,
-            norm: None,
+            norm: f64::NAN,
         }
-    }
-
-    fn decache(&mut self) {
-        self.norm = None
     }
 
     pub fn gamma_limits(mut self, gamma_min: f64, gamma_max: f64, gamma_cutoff: f64) -> Self {
         self.gamma_min = gamma_min;
         self.gamma_max = gamma_max;
         self.gamma_cutoff = gamma_cutoff;
-        self.decache();
         self
     }
 
-    pub fn finish(self, coeff: Coefficient, nu: f64, b: f64, n_e: f64, theta: f64) -> SynchrotronCalculator<Self> {
+    pub fn finish(mut self, coeff: Coefficient, nu: f64, b: f64, n_e: f64, theta: f64) -> SynchrotronCalculator<Self> {
+        // Compute the normalization factor.
+
+        let mut ws = gsl::IntegrationWorkspace::new(1000);
+        let integral = ws.qag(|g| g.powf(-self.p) * (-g / self.gamma_cutoff).exp(),
+                              self.gamma_min, self.gamma_max)
+            .tolerance(0., 1e-8)
+            .rule(gsl::IntegrationRule::GaussKonrod31)
+            .compute()
+            .map(|r| r.value)
+            .unwrap();
+        self.norm = n_e / (2. * TWO_PI * integral);
+
+        // Ready to go.
+
         let nu_c = ELECTRON_CHARGE * b / (TWO_PI * MASS_ELECTRON * SPEED_LIGHT);
 
         SynchrotronCalculator {
             coeff: coeff,
             nu: nu,
             s: nu / nu_c,
-            electron_density: n_e,
             cos_observer_angle: theta.cos(),
             sin_observer_angle: theta.sin(),
             d: self,
@@ -141,7 +149,6 @@ pub struct SynchrotronCalculator<D> {
     coeff: Coefficient,
     nu: f64,
     s: f64,
-    electron_density: f64,
     cos_observer_angle: f64,
     sin_observer_angle: f64,
 
@@ -154,47 +161,25 @@ pub struct SynchrotronCalculator<D> {
 // Implementation
 
 pub trait DistributionFunction {
+    /// This function gives the modified distribution function `d(n_e) /
+    /// (gamma^2 beta d(gamma) d(cos xi) d(phi)])`. In all the cases in
+    /// Symphony, isotropy and gyrotropy are assumed, so the `d(cos xi)
+    /// d(phi)` become 1/4pi. The funny scalings are due to me being stuck on
+    /// the numerical derivative step. To be revisited.
     fn calc_f(&mut self, gamma: f64) -> f64;
-
-    fn calc_f_for_normalization(&mut self, gamma: f64) -> f64 {
-        self.calc_f(gamma)
-    }
 }
 
 
 impl DistributionFunction for SynchrotronCalculator<PowerLawDistribution> {
     fn calc_f(&mut self, gamma: f64) -> f64 {
         if gamma < self.d.gamma_min || gamma > self.d.gamma_max {
-            return 0.;
-        }
-
-        let norm = if let Some(n) = self.d.norm {
-            n
+            0.
         } else {
-            let n = 1. / self.normalize_f().unwrap();
-            self.d.norm = Some(n);
-            n
-        };
+            let beta = (1. - 1. / (gamma * gamma)).sqrt();
 
-        let beta = (1. - 1. / (gamma * gamma)).sqrt();
-
-        let prefactor = self.electron_density * (self.d.p - 1.) /
-            (self.d.gamma_min.powf(1. - self.d.p) - self.d.gamma_max.powf(1. - self.d.p));;
-
-        let body = gamma.powf(-self.d.p) * (-gamma / self.d.gamma_cutoff).exp();
-
-        norm * prefactor * body / (SPEED_LIGHT.powi(3) * MASS_ELECTRON.powi(3) * gamma * gamma * beta)
-    }
-
-    fn calc_f_for_normalization(&mut self, gamma: f64) -> f64 {
-        if gamma < self.d.gamma_min || gamma > self.d.gamma_max {
-            return 0.;
+            self.d.norm * gamma.powf(-self.d.p) * (-gamma / self.d.gamma_cutoff).exp()
+                / (gamma * gamma * beta)
         }
-
-        let norm_term = 4. * PI;
-        let prefactor = (self.d.p - 1.) / (self.d.gamma_min.powf(1. - self.d.p) - self.d.gamma_max.powf(1. - self.d.p));
-        let body = gamma.powf(-self.d.p) * (-gamma / self.d.gamma_cutoff).exp();
-        norm_term * prefactor * body
     }
 }
 
@@ -213,7 +198,9 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         let mut gamma_workspace = gsl::IntegrationWorkspace::new(5000);
 
         for n in ((n_minus + 1.) as i64)..((n_minus + 1. + N_MAX) as i64) {
-            ans += self.gamma_integral(&mut gamma_workspace, n as f64);
+            let r = self.gamma_integral(&mut gamma_workspace, n as f64);
+            ans += r;
+            //println!("discrete {} {:.6e}", n, r);
         }
 
         // Now integrate the remaining n's, pretending that n can assume any
@@ -242,9 +229,12 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         // Finally, apply the dimensional constants that don't vary inside any of the
         // integrals.
         //
-        // For both emission and absorption, there's a term of `gamma^2 beta m_e^3 c^3`
-        // that comes from the coordinate transform of the distribution function; see
-        // Pandya+ (2016) equation 14.
+        // There's a term of `gamma^2 beta m_e^3 c^3` that plays a role in
+        // doing a unit conversion in the integrals. We divide out this term
+        // inside the distribution function and multiply it back in inside the
+        // integral. **NOTE** that for absorption coefficients we take the
+        // derivative with regards to gamma in between these steps, which is
+        // why we don't just remove the superfluous operations. For now.
         //
         // There is also a term of `2 pi` that comes from assuming gyrotropy,
         // i.e. uniformity in electron azimuth angle.
@@ -260,10 +250,11 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         //
         // Collecting the terms that aren't gamma or beta:
 
-        ans * match self.coeff {
+        let tmp = (MASS_ELECTRON * SPEED_LIGHT).powi(3);
+
+        ans / tmp * match self.coeff {
             Coefficient::Emission(_) => {
-                (TWO_PI * ELECTRON_CHARGE * MASS_ELECTRON * SPEED_LIGHT).powi(2) *
-                    MASS_ELECTRON * self.nu / self.cos_observer_angle.abs()
+                (TWO_PI * ELECTRON_CHARGE * SPEED_LIGHT).powi(2) * MASS_ELECTRON.powi(3) * self.nu / self.cos_observer_angle.abs()
             },
             Coefficient::Absorption(_) => {
                 -1. * (TWO_PI * ELECTRON_CHARGE * MASS_ELECTRON * SPEED_LIGHT).powi(2) /
@@ -304,7 +295,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             let deriv = gsl::deriv_central(|n| self.gamma_integral(&mut gamma_workspace, n), n_start, 1e-8)
                 .map(|r| r.value)?;
 
-            if deriv.abs() < DERIV_TOL {
+            if contrib != 0. && (deriv / contrib).abs() < DERIV_TOL {
                 delta_n *= incr_step_factor;
             }
 
@@ -317,7 +308,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
                 .rule(gsl::IntegrationRule::GaussKonrod31)
                 .compute()
                 .map(|r| r.value)?;
-
+            //println!("NI {:.6e} {:.6e} {:.6e} {:.6e} {:.6e}", n_start, n_start + delta_n, contrib, deriv, deriv / contrib);
             ans += contrib;
             n_start += delta_n;
         }
@@ -419,12 +410,8 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         // papers can be pulled out of the integral.
 
         let ans = match self.coeff {
-            Coefficient::Emission(_) => {
-                gamma * gamma * self.calc_f(gamma) * pol_term
-            },
-            Coefficient::Absorption(_) => {
-                gamma * gamma * self.numerical_differential_of_f(gamma) * pol_term
-            }
+            Coefficient::Emission(_) => gamma * gamma * self.calc_f(gamma) * pol_term,
+            Coefficient::Absorption(_) => gamma * gamma * self.numerical_differential_of_f(gamma) * pol_term,
         };
 
         if ans.is_finite() {
@@ -451,15 +438,5 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
                 (f_plus - f_minus) / (2. * EPSILON)
             }
         }
-    }
-
-    /// A generic helper that the distribution functions can use.
-    fn normalize_f(&mut self) -> gsl::GslResult<f64> {
-        let mut ws = gsl::IntegrationWorkspace::new(1000);
-
-        ws.qagiu(|x| self.calc_f_for_normalization(x), 1.)
-            .tolerance(0., 1e-8)
-            .compute()
-            .map(|r| r.value)
     }
 }
