@@ -73,32 +73,34 @@ p: {:.10e}", cname, theirs, ours, s, theta, p);
     }
 }
 
+const TOL: f64 = 0.01;
+
 #[test]
 fn compare_powerlaw_subset_ji() {
-    compare_powerlaw_subset(Coefficient::Emission(Stokes::I), "J_I", 3, 0.03, 0.01);
+    compare_powerlaw_subset(Coefficient::Emission(Stokes::I), "J_I", 3, 0.03, TOL);
 }
 
 #[test]
 fn compare_powerlaw_subset_jq() {
-    compare_powerlaw_subset(Coefficient::Emission(Stokes::Q), "J_Q", 5, 0.03, 0.01);
+    compare_powerlaw_subset(Coefficient::Emission(Stokes::Q), "J_Q", 5, 0.03, TOL);
 }
 
 #[test]
 fn compare_powerlaw_subset_jv() {
-    compare_powerlaw_subset(Coefficient::Emission(Stokes::V), "J_V", 7, 0.03, 0.01);
+    compare_powerlaw_subset(Coefficient::Emission(Stokes::V), "J_V", 7, 0.03, TOL);
 }
 
 #[test]
 fn compare_powerlaw_subset_ai() {
-    compare_powerlaw_subset(Coefficient::Absorption(Stokes::I), "A_I", 4, 0.03, 0.01);
+    compare_powerlaw_subset(Coefficient::Absorption(Stokes::I), "A_I", 4, 0.03, TOL);
 }
 
 #[test]
 fn compare_powerlaw_subset_aq() {
-    compare_powerlaw_subset(Coefficient::Absorption(Stokes::Q), "A_Q", 6, 0.03, 0.01);
+    compare_powerlaw_subset(Coefficient::Absorption(Stokes::Q), "A_Q", 6, 0.03, TOL);
 }
 
 #[test]
 fn compare_powerlaw_subset_av() {
-    compare_powerlaw_subset(Coefficient::Absorption(Stokes::V), "A_V", 8, 0.03, 0.01);
+    compare_powerlaw_subset(Coefficient::Absorption(Stokes::V), "A_V", 8, 0.03, TOL);
 }
