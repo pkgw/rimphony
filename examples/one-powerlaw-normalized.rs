@@ -4,7 +4,8 @@
 
 extern crate rimphony;
 
-use rimphony::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI, Coefficient, Stokes};
+use rimphony::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI,
+               Coefficient, Stokes, SynchrotronCalculator};
 
 fn main() {
     const S: f64 = 1.0360583634e3;
@@ -24,8 +25,8 @@ fn main() {
 
     let val = rimphony::PowerLawDistribution::new(P)
         .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-        .finish(COEFF, STOKES, NU, B, N_E, THETA)
-        .compute();
+        .full_calculation()
+        .compute_cgs(COEFF, STOKES, NU, B, N_E, THETA);
 
     let remove_units = match COEFF {
         Coefficient::Emission =>

@@ -7,7 +7,8 @@
 #[macro_use] extern crate bencher;
 extern crate rimphony;
 
-use rimphony::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI, Coefficient, Stokes};
+use rimphony::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI,
+               Coefficient, Stokes, SynchrotronCalculator};
 use bencher::Bencher;
 
 
@@ -47,8 +48,8 @@ fn powerlaw_inner(coeff: Coefficient, stokes: Stokes, row_number: usize) {
 
     rimphony::PowerLawDistribution::new(p)
         .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-        .finish(coeff, stokes, nu, bfield, n_e, theta)
-        .compute();
+        .full_calculation()
+        .compute_cgs(coeff, stokes, nu, bfield, n_e, theta);
 }
 
 

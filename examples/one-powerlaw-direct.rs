@@ -3,7 +3,7 @@
 
 extern crate rimphony;
 
-use rimphony::{Coefficient, Stokes};
+use rimphony::{Coefficient, Stokes, SynchrotronCalculator};
 
 fn main() {
     const NU: f64 = 1e9;
@@ -19,8 +19,8 @@ fn main() {
 
     let ji = rimphony::PowerLawDistribution::new(P)
         .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-        .finish(Coefficient::Emission, Stokes::I, NU, B, N_E, THETA)
-        .compute();
+        .full_calculation()
+        .compute_cgs(Coefficient::Emission, Stokes::I, NU, B, N_E, THETA);
 
     println!("Symphony j_I: {:e}   Ours: {:e}", SYMPHONY_JI, ji);
 }

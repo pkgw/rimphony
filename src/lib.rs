@@ -66,16 +66,87 @@ pub enum Coefficient {
 }
 
 
+/// An electron distribution function. We can compute synchrotron coefficients
+/// using different distributions.
+pub trait DistributionFunction {
+    /// This function gives the modified distribution function `d(n_e) /
+    /// (gamma^2 beta d(gamma) d(cos xi) d(phi)])`. In all the cases in
+    /// Symphony, isotropy and gyrotropy are assumed, so the `d(cos xi)
+    /// d(phi)` become 1/4pi. The funny scalings are due to me being stuck on
+    /// the numerical derivative step. To be revisited.
+    fn calc_f(&self, gamma: f64, cos_xi: f64) -> f64;
+
+    /// The derivative of `calc_f` with regards to `gamma` and `cos_xi`. This
+    /// must include the derivative with regards to the `1 / (gamma^2 beta)`
+    /// factor that turns the gamma/cos xi/phi coordinates into p^3
+    /// coordinates.
+    fn calc_f_derivatives(&self, gamma: f64, cos_xi: f64) -> (f64, f64);
+}
+
+
+/// A type that can compute synchrotron coefficients.
+pub trait SynchrotronCalculator {
+    /// Compute a coefficient using the dimensionless parameters that
+    /// characterize the problem. *s* is the harmonic number of the observing
+    /// frequency relative to the cyclotron frequency and *theta* is the
+    /// observer angle relative to the magnetic field direction (in radians).
+    fn compute_dimensionless(&mut self, coeff: Coefficient, stokes: Stokes,
+                             s: f64, theta: f64) -> f64;
+
+    /// Compute a coefficient using standard physics parameters in cgs units.
+    /// *nu* is the observing frequency in Hz, *b* is the magnetic field
+    /// strength in Gauss, *n_e* is the electron density in cm^-3, and *theta*
+    /// is the observer angle relative to the magnetic field direction in
+    /// radians.
+    fn compute_cgs(&mut self, coeff: Coefficient, stokes: Stokes,
+                   nu: f64, b: f64, n_e: f64, theta: f64) -> f64 {
+        let nu_c = ELECTRON_CHARGE * b / (TWO_PI * MASS_ELECTRON * SPEED_LIGHT);
+        let val = self.compute_dimensionless(coeff, stokes, nu / nu_c, theta);
+
+        match coeff {
+            Coefficient::Emission => val * n_e * nu,
+            Coefficient::Absorption => val * n_e / nu,
+        }
+    }
+}
+
 // Distributions
 
 pub struct PowerLawDistribution {
     p: f64,
-
     gamma_min: f64,
     gamma_max: f64,
     inv_gamma_cutoff: f64,
-
     norm: f64,
+}
+
+
+impl DistributionFunction for PowerLawDistribution {
+    fn calc_f(&self, gamma: f64, _cos_xi: f64) -> f64 {
+        if gamma < self.gamma_min || gamma > self.gamma_max {
+            0.
+        } else {
+            let beta = (1. - 1. / (gamma * gamma)).sqrt();
+
+            self.norm * gamma.powf(-self.p) * (-gamma * self.inv_gamma_cutoff).exp()
+                / (gamma * gamma * beta)
+        }
+    }
+
+    fn calc_f_derivatives(&self, gamma: f64, _cos_xi: f64) -> (f64, f64) {
+        if gamma < self.gamma_min || gamma > self.gamma_max {
+            return (0., 0.);
+        }
+
+        let p_plus_1 = self.p + 1.;
+        let g2_minus_1 = gamma * gamma - 1.;
+        let dfdg = -self.norm * gamma.powf(-p_plus_1) / g2_minus_1.sqrt() *
+            (-gamma * self.inv_gamma_cutoff).exp() *
+            (p_plus_1 / gamma + gamma / g2_minus_1 + self.inv_gamma_cutoff);
+        let dfdcx = 0.;
+
+        (dfdg, dfdcx)
+    }
 }
 
 
@@ -97,8 +168,7 @@ impl PowerLawDistribution {
         self
     }
 
-    pub fn finish(mut self, coeff: Coefficient, stokes: Stokes,
-                  nu: f64, b: f64, n_e: f64, theta: f64) -> SynchrotronCalculator<Self> {
+    pub fn full_calculation(mut self) -> FullSynchrotronCalculator<Self> {
         // Compute the normalization factor.
 
         let mut ws = gsl::IntegrationWorkspace::new(1000);
@@ -109,25 +179,17 @@ impl PowerLawDistribution {
             .compute()
             .map(|r| r.value)
             .unwrap();
-        self.norm = n_e / (2. * TWO_PI * integral);
+        self.norm = 1. / (2. * TWO_PI * integral);
 
         // Ready to go.
-
-        let nu_c = ELECTRON_CHARGE * b / (TWO_PI * MASS_ELECTRON * SPEED_LIGHT);
-
-        SynchrotronCalculator {
-            coeff: coeff,
-            stokes: stokes,
-            nu: nu,
-            s: nu / nu_c,
-            cos_observer_angle: theta.cos(),
-            sin_observer_angle: theta.sin(),
-            d: self,
-            stokes_v_switch: StokesVSwitch::Inactive,
-        }
+        FullSynchrotronCalculator(self)
     }
 }
 
+
+/// The FullSunchrotronCalculator implements the fully detailed
+/// double-integral calculation.
+pub struct FullSynchrotronCalculator<D>(D);
 
 #[derive(Copy,Clone,Debug,Eq,Hash,PartialEq)]
 enum StokesVSwitch {
@@ -136,70 +198,33 @@ enum StokesVSwitch {
     NegativeLobe,
 }
 
-
-pub struct SynchrotronCalculator<D> {
+struct FullCalculationState<'a, D: 'a> {
+    d: &'a D,
     coeff: Coefficient,
     stokes: Stokes,
-    nu: f64,
     s: f64,
     cos_observer_angle: f64,
     sin_observer_angle: f64,
-
-    d: D,
-
     stokes_v_switch: StokesVSwitch,
 }
 
-
-// Implementation
-
-pub trait DistributionFunction {
-    /// This function gives the modified distribution function `d(n_e) /
-    /// (gamma^2 beta d(gamma) d(cos xi) d(phi)])`. In all the cases in
-    /// Symphony, isotropy and gyrotropy are assumed, so the `d(cos xi)
-    /// d(phi)` become 1/4pi. The funny scalings are due to me being stuck on
-    /// the numerical derivative step. To be revisited.
-    fn calc_f(&mut self, gamma: f64, cos_xi: f64) -> f64;
-
-    /// The derivative of `calc_f` with regards to `gamma` and `cos_xi`. This
-    /// must include the derivative with regards to the `1 / (gamma^2 beta)`
-    /// factor that turns the gamma/cos xi/phi coordinates into p^3
-    /// coordinates.
-    fn calc_f_derivatives(&mut self, gamma: f64, cos_xi: f64) -> (f64, f64);
-}
-
-
-impl DistributionFunction for SynchrotronCalculator<PowerLawDistribution> {
-    fn calc_f(&mut self, gamma: f64, _cos_xi: f64) -> f64 {
-        if gamma < self.d.gamma_min || gamma > self.d.gamma_max {
-            0.
-        } else {
-            let beta = (1. - 1. / (gamma * gamma)).sqrt();
-
-            self.d.norm * gamma.powf(-self.d.p) * (-gamma * self.d.inv_gamma_cutoff).exp()
-                / (gamma * gamma * beta)
-        }
-    }
-
-    fn calc_f_derivatives(&mut self, gamma: f64, _cos_xi: f64) -> (f64, f64) {
-        if gamma < self.d.gamma_min || gamma > self.d.gamma_max {
-            return (0., 0.);
-        }
-
-        let p_plus_1 = self.d.p + 1.;
-        let g2_minus_1 = gamma * gamma - 1.;
-        let dfdg = -self.d.norm * gamma.powf(-p_plus_1) / g2_minus_1.sqrt() *
-            (-gamma * self.d.inv_gamma_cutoff).exp() *
-            (p_plus_1 / gamma + gamma / g2_minus_1 + self.d.inv_gamma_cutoff);
-        let dfdcx = 0.;
-
-        (dfdg, dfdcx)
+impl<D: DistributionFunction> SynchrotronCalculator for FullSynchrotronCalculator<D> {
+    fn compute_dimensionless(&mut self, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> f64 {
+        FullCalculationState {
+            d: &self.0,
+            coeff: coeff,
+            stokes: stokes,
+            s: s,
+            cos_observer_angle: theta.cos(),
+            sin_observer_angle: theta.sin(),
+            stokes_v_switch: StokesVSwitch::Inactive,
+        }.compute()
     }
 }
 
 
-impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
-    pub fn compute(&mut self) -> f64 {
+impl<'a, D: 'a + DistributionFunction> FullCalculationState<'a, D> {
+    fn compute(&mut self) -> f64 {
         // This function used to be "n_summation" in symphony's integrate.c.
 
         let mut ans = 0_f64;
@@ -265,12 +290,12 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
 
         ans * match self.coeff {
             Coefficient::Emission => {
-                (TWO_PI * ELECTRON_CHARGE).powi(2) * self.nu /
+                (TWO_PI * ELECTRON_CHARGE).powi(2) /
                     (SPEED_LIGHT * self.cos_observer_angle.abs())
             },
             Coefficient::Absorption => {
                 -1. * (TWO_PI * ELECTRON_CHARGE).powi(2) /
-                    (2. * MASS_ELECTRON * SPEED_LIGHT * self.nu * self.cos_observer_angle.abs())
+                    (2. * MASS_ELECTRON * SPEED_LIGHT * self.cos_observer_angle.abs())
             },
         }
     }
@@ -425,9 +450,9 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         // papers can be pulled out of the integral.
 
         gamma * gamma * pol_term * match self.coeff {
-            Coefficient::Emission => self.calc_f(gamma, cos_xi),
+            Coefficient::Emission => self.d.calc_f(gamma, cos_xi),
             Coefficient::Absorption => {
-                let (dfdg, dfdcx) = self.calc_f_derivatives(gamma, cos_xi);
+                let (dfdg, dfdcx) = self.d.calc_f_derivatives(gamma, cos_xi);
                 let dfdcx_factor = (beta * self.cos_observer_angle - cos_xi) / (gamma - 1. / gamma);
                 dfdg + dfdcx_factor * dfdcx
             },

@@ -8,7 +8,8 @@ extern crate rand;
 extern crate regex;
 extern crate rimphony;
 
-use rimphony::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI, Coefficient, Stokes};
+use rimphony::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI,
+               Coefficient, Stokes, SynchrotronCalculator};
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::path::PathBuf;
@@ -50,8 +51,8 @@ fn compare_powerlaw_subset(coeff: Coefficient, stokes: Stokes, cname: &str, inde
         let t0 = Instant::now();
         let ours = rimphony::PowerLawDistribution::new(p)
             .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-            .finish(coeff, stokes, NU, bfield, N_E, theta)
-            .compute();
+            .full_calculation()
+            .compute_cgs(coeff, stokes, NU, bfield, N_E, theta);
 
         let elapsed = t0.elapsed();
         if elapsed.as_secs() > 3 {
