@@ -19,7 +19,7 @@ fn main() {
 
     let ji = rimphony::PowerLawDistribution::new(P)
         .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-        .finish(Coefficient::Emission(Stokes::I), NU, B, N_E, THETA)
+        .finish(Coefficient::Emission, Stokes::I, NU, B, N_E, THETA)
         .compute();
 
     println!("Symphony j_I: {:e}   Ours: {:e}", SYMPHONY_JI, ji);

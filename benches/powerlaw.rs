@@ -32,7 +32,7 @@ const LATIN_SQUARE: &[usize] = &[
     4, 2, 3, 0, 1,
 ];
 
-fn powerlaw_inner(coeff: rimphony::Coefficient, row_number: usize) {
+fn powerlaw_inner(coeff: Coefficient, stokes: Stokes, row_number: usize) {
     // This function used to loop over every row in the Latin square, but that
     // would lead to the benchmark taking way too long to run.
 
@@ -47,44 +47,44 @@ fn powerlaw_inner(coeff: rimphony::Coefficient, row_number: usize) {
 
     rimphony::PowerLawDistribution::new(p)
         .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-        .finish(coeff, nu, bfield, n_e, theta)
+        .finish(coeff, stokes, nu, bfield, n_e, theta)
         .compute();
 }
 
 
 fn powerlaw_ji_0(b: &mut Bencher) {
     b.iter(|| {
-        powerlaw_inner(Coefficient::Emission(Stokes::I), 0);
+        powerlaw_inner(Coefficient::Emission, Stokes::I, 0);
     });
 }
 
 fn powerlaw_jq_0(b: &mut Bencher) {
     b.iter(|| {
-        powerlaw_inner(Coefficient::Emission(Stokes::Q), 0);
+        powerlaw_inner(Coefficient::Emission, Stokes::Q, 0);
     });
 }
 
 fn powerlaw_jv_0(b: &mut Bencher) {
     b.iter(|| {
-        powerlaw_inner(Coefficient::Emission(Stokes::V), 0);
+        powerlaw_inner(Coefficient::Emission, Stokes::V, 0);
     });
 }
 
 fn powerlaw_ai_0(b: &mut Bencher) {
     b.iter(|| {
-        powerlaw_inner(Coefficient::Absorption(Stokes::I), 0);
+        powerlaw_inner(Coefficient::Absorption, Stokes::I, 0);
     });
 }
 
 fn powerlaw_aq_0(b: &mut Bencher) {
     b.iter(|| {
-        powerlaw_inner(Coefficient::Absorption(Stokes::Q), 0);
+        powerlaw_inner(Coefficient::Absorption, Stokes::Q, 0);
     });
 }
 
 fn powerlaw_av_0(b: &mut Bencher) {
     b.iter(|| {
-        powerlaw_inner(Coefficient::Absorption(Stokes::V), 0);
+        powerlaw_inner(Coefficient::Absorption, Stokes::V, 0);
     });
 }
 
@@ -93,37 +93,37 @@ fn powerlaw_av_0(b: &mut Bencher) {
 
 fn powerlaw_ji_1(b: &mut Bencher) {
     b.iter(|| {
-        powerlaw_inner(Coefficient::Emission(Stokes::I), 1);
+        powerlaw_inner(Coefficient::Emission, Stokes::I, 1);
     });
 }
 
 fn powerlaw_jq_2(b: &mut Bencher) {
     b.iter(|| {
-        powerlaw_inner(Coefficient::Emission(Stokes::Q), 2);
+        powerlaw_inner(Coefficient::Emission, Stokes::Q, 2);
     });
 }
 
 fn powerlaw_jv_3(b: &mut Bencher) {
     b.iter(|| {
-        powerlaw_inner(Coefficient::Emission(Stokes::V), 3);
+        powerlaw_inner(Coefficient::Emission, Stokes::V, 3);
     });
 }
 
 fn powerlaw_ai_4(b: &mut Bencher) {
     b.iter(|| {
-        powerlaw_inner(Coefficient::Absorption(Stokes::I), 4);
+        powerlaw_inner(Coefficient::Absorption, Stokes::I, 4);
     });
 }
 
 fn powerlaw_aq_1(b: &mut Bencher) {
     b.iter(|| {
-        powerlaw_inner(Coefficient::Absorption(Stokes::Q), 1);
+        powerlaw_inner(Coefficient::Absorption, Stokes::Q, 1);
     });
 }
 
 fn powerlaw_av_2(b: &mut Bencher) {
     b.iter(|| {
-        powerlaw_inner(Coefficient::Absorption(Stokes::V), 2);
+        powerlaw_inner(Coefficient::Absorption, Stokes::V, 2);
     });
 }
 

@@ -21,7 +21,7 @@ const TOP: &'static str = env!("CARGO_MANIFEST_DIR");
 /// fiducially; the coefficients can be scaled deterministically to apply for
 /// any values of *B*, *nu*, and *n_e*.
 
-fn compare_powerlaw_subset(coeff: rimphony::Coefficient, cname: &str, index: usize, fraction_to_check: f64, rtol: f64) {
+fn compare_powerlaw_subset(coeff: Coefficient, stokes: Stokes, cname: &str, index: usize, fraction_to_check: f64, rtol: f64) {
     const NU: f64 = 1e9;
     const N_E: f64 = 1.;
     const GAMMA_MIN: f64 = 1.;
@@ -50,13 +50,13 @@ fn compare_powerlaw_subset(coeff: rimphony::Coefficient, cname: &str, index: usi
         let t0 = Instant::now();
         let ours = rimphony::PowerLawDistribution::new(p)
             .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-            .finish(coeff, NU, bfield, N_E, theta)
+            .finish(coeff, stokes, NU, bfield, N_E, theta)
             .compute();
 
         let elapsed = t0.elapsed();
         if elapsed.as_secs() > 3 {
-            println!("SLOW: c = {:?} s = {:.10e} theta = {:.10e} p = {:.10e} elapsed = {:.0} ms",
-                     coeff, s, theta, p,
+            println!("SLOW: c = {:?}/{:?} s = {:.10e} theta = {:.10e} p = {:.10e} elapsed = {:.0} ms",
+                     coeff, stokes, s, theta, p,
                      elapsed.as_secs() as f64 * 1000. + elapsed.subsec_nanos() as f64 * 1e-6);
         }
 
@@ -77,30 +77,30 @@ const TOL: f64 = 0.01;
 
 #[test]
 fn compare_powerlaw_subset_ji() {
-    compare_powerlaw_subset(Coefficient::Emission(Stokes::I), "J_I", 3, 0.03, TOL);
+    compare_powerlaw_subset(Coefficient::Emission, Stokes::I, "J_I", 3, 0.03, TOL);
 }
 
 #[test]
 fn compare_powerlaw_subset_jq() {
-    compare_powerlaw_subset(Coefficient::Emission(Stokes::Q), "J_Q", 5, 0.03, TOL);
+    compare_powerlaw_subset(Coefficient::Emission, Stokes::Q, "J_Q", 5, 0.03, TOL);
 }
 
 #[test]
 fn compare_powerlaw_subset_jv() {
-    compare_powerlaw_subset(Coefficient::Emission(Stokes::V), "J_V", 7, 0.03, TOL);
+    compare_powerlaw_subset(Coefficient::Emission, Stokes::V, "J_V", 7, 0.03, TOL);
 }
 
 #[test]
 fn compare_powerlaw_subset_ai() {
-    compare_powerlaw_subset(Coefficient::Absorption(Stokes::I), "A_I", 4, 0.03, TOL);
+    compare_powerlaw_subset(Coefficient::Absorption, Stokes::I, "A_I", 4, 0.03, TOL);
 }
 
 #[test]
 fn compare_powerlaw_subset_aq() {
-    compare_powerlaw_subset(Coefficient::Absorption(Stokes::Q), "A_Q", 6, 0.03, TOL);
+    compare_powerlaw_subset(Coefficient::Absorption, Stokes::Q, "A_Q", 6, 0.03, TOL);
 }
 
 #[test]
 fn compare_powerlaw_subset_av() {
-    compare_powerlaw_subset(Coefficient::Absorption(Stokes::V), "A_V", 8, 0.03, TOL);
+    compare_powerlaw_subset(Coefficient::Absorption, Stokes::V, "A_V", 8, 0.03, TOL);
 }

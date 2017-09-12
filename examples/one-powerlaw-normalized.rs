@@ -10,7 +10,8 @@ fn main() {
     const S: f64 = 1.0360583634e3;
     const THETA: f64 = 7.4017422303e-1;
     const P: f64 = 2.3306843452e0;
-    const COEFF: Coefficient = Coefficient::Absorption(Stokes::I);
+    const COEFF: Coefficient = Coefficient::Absorption;
+    const STOKES: Stokes = Stokes::I;
     const SYMPHONY_VAL: f64 = 0.;
 
     const NU: f64 = 1e9;
@@ -23,13 +24,13 @@ fn main() {
 
     let val = rimphony::PowerLawDistribution::new(P)
         .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-        .finish(COEFF, NU, B, N_E, THETA)
+        .finish(COEFF, STOKES, NU, B, N_E, THETA)
         .compute();
 
     let remove_units = match COEFF {
-        Coefficient::Emission(_) =>
+        Coefficient::Emission =>
             SPEED_LIGHT * THETA.cos().abs() / ((TWO_PI * ELECTRON_CHARGE).powi(2) * NU),
-        Coefficient::Absorption(_) =>
+        Coefficient::Absorption =>
             -2. * MASS_ELECTRON * SPEED_LIGHT * NU * THETA.cos().abs() / (TWO_PI * ELECTRON_CHARGE).powi(2),
     };
 

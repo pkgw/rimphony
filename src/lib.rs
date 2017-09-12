@@ -59,20 +59,10 @@ pub enum Stokes {
 pub enum Coefficient {
     /// The emission cofficient, in units of ergs per second per square
     /// centimeter per Hertz per steradian.
-    Emission(Stokes),
+    Emission,
 
     /// The absorption coefficient, in units of inverse centimeters.
-    Absorption(Stokes),
-}
-
-
-impl Coefficient {
-    pub fn stokes(&self) -> Stokes {
-        match self {
-            &Coefficient::Emission(x) => x,
-            &Coefficient::Absorption(x) => x,
-        }
-    }
+    Absorption,
 }
 
 
@@ -107,7 +97,8 @@ impl PowerLawDistribution {
         self
     }
 
-    pub fn finish(mut self, coeff: Coefficient, nu: f64, b: f64, n_e: f64, theta: f64) -> SynchrotronCalculator<Self> {
+    pub fn finish(mut self, coeff: Coefficient, stokes: Stokes,
+                  nu: f64, b: f64, n_e: f64, theta: f64) -> SynchrotronCalculator<Self> {
         // Compute the normalization factor.
 
         let mut ws = gsl::IntegrationWorkspace::new(1000);
@@ -126,6 +117,7 @@ impl PowerLawDistribution {
 
         SynchrotronCalculator {
             coeff: coeff,
+            stokes: stokes,
             nu: nu,
             s: nu / nu_c,
             cos_observer_angle: theta.cos(),
@@ -147,6 +139,7 @@ enum StokesVSwitch {
 
 pub struct SynchrotronCalculator<D> {
     coeff: Coefficient,
+    stokes: Stokes,
     nu: f64,
     s: f64,
     cos_observer_angle: f64,
@@ -237,7 +230,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             ans += n_integral_contrib;
         }
 
-        if self.coeff.stokes() == Stokes::V {
+        if self.stokes == Stokes::V {
             self.stokes_v_switch = StokesVSwitch::NegativeLobe;
             let n_integral_contrib = self.n_integration(n_start).unwrap_or(f64::NAN);
             if !n_integral_contrib.is_nan() {
@@ -271,11 +264,11 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         // Collecting the terms that aren't gamma or beta:
 
         ans * match self.coeff {
-            Coefficient::Emission(_) => {
+            Coefficient::Emission => {
                 (TWO_PI * ELECTRON_CHARGE).powi(2) * self.nu /
                     (SPEED_LIGHT * self.cos_observer_angle.abs())
             },
-            Coefficient::Absorption(_) => {
+            Coefficient::Absorption => {
                 -1. * (TWO_PI * ELECTRON_CHARGE).powi(2) /
                     (2. * MASS_ELECTRON * SPEED_LIGHT * self.nu * self.cos_observer_angle.abs())
             },
@@ -370,7 +363,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         let gamma_minus_high = gamma_peak - (gamma_peak - gamma_minus) / width;
         let gamma_plus_high = gamma_peak - (gamma_peak - gamma_plus) / width;
 
-        if self.coeff.stokes() == Stokes::V && self.stokes_v_switch != StokesVSwitch::Inactive {
+        if self.stokes == Stokes::V && self.stokes_v_switch != StokesVSwitch::Inactive {
             if self.stokes_v_switch == StokesVSwitch::PositiveLobe {
                 self._gamma_integral_inner(workspace, gamma_peak, gamma_plus_high, n)
             } else {
@@ -420,7 +413,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         let mj = m * leung_bessel::Jn(n, z);
         let njp = big_n * leung_bessel::Jn_prime(n, z);
 
-        let pol_term = match self.coeff.stokes() {
+        let pol_term = match self.stokes {
             Stokes::I => mj * mj + njp * njp,
             Stokes::Q => mj * mj - njp * njp,
             Stokes::V => 2. * mj * njp,
@@ -432,8 +425,8 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         // papers can be pulled out of the integral.
 
         gamma * gamma * pol_term * match self.coeff {
-            Coefficient::Emission(_) => self.calc_f(gamma, cos_xi),
-            Coefficient::Absorption(_) => {
+            Coefficient::Emission => self.calc_f(gamma, cos_xi),
+            Coefficient::Absorption => {
                 let (dfdg, dfdcx) = self.calc_f_derivatives(gamma, cos_xi);
                 let dfdcx_factor = (beta * self.cos_observer_angle - cos_xi) / (gamma - 1. / gamma);
                 dfdg + dfdcx_factor * dfdcx
