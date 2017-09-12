@@ -21,8 +21,8 @@ const SS: &[f64] = &[1e0, 1e1, 1e2, 1e3, 1e4];
 const THETAS: &[f64] = &[0.05, 0.430, 0.810, 1.190, 1.5707];
 const PS: &[f64] = &[1.5, 1.75, 2.5, 3.25, 4.];
 const GAMMA_MIN: f64 = 1.;
-const GAMMA_MAX: f64 = 1000.;
-const GAMMA_CUTOFF: f64 = 1e7;
+const GAMMA_MAX: f64 = 1e12;
+const GAMMA_CUTOFF: f64 = 1e10;
 
 const LATIN_SQUARE: &[usize] = &[
     1, 4, 2, 3, 0,

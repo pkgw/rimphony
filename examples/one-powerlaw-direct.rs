@@ -14,8 +14,8 @@ fn main() {
     const SYMPHONY_JI: f64 = 2.64399749412774e-21;
 
     const GAMMA_MIN: f64 = 1.;
-    const GAMMA_MAX: f64 = 1000.;
-    const GAMMA_CUTOFF: f64 = 1e7;
+    const GAMMA_MAX: f64 = 1e12;
+    const GAMMA_CUTOFF: f64 = 1e10;
 
     let ji = rimphony::PowerLawDistribution::new(P)
         .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)

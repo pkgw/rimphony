@@ -94,8 +94,8 @@ impl PowerLawDistribution {
         PowerLawDistribution {
             p: p,
             gamma_min: 1.,
-            gamma_max: 1000.,
-            gamma_cutoff: 1e7,
+            gamma_max: 1e12,
+            gamma_cutoff: 1e10,
             norm: f64::NAN,
         }
     }
