@@ -101,7 +101,7 @@ pub trait SynchrotronCalculator {
     /// characterize the problem. *s* is the harmonic number of the observing
     /// frequency relative to the cyclotron frequency and *theta* is the
     /// observer angle relative to the magnetic field direction (in radians).
-    fn compute_dimensionless(&mut self, coeff: Coefficient, stokes: Stokes,
+    fn compute_dimensionless(&self, coeff: Coefficient, stokes: Stokes,
                              s: f64, theta: f64) -> f64;
 
     /// Compute a coefficient using standard physics parameters in cgs units.
@@ -109,7 +109,7 @@ pub trait SynchrotronCalculator {
     /// strength in Gauss, *n_e* is the electron density in cm^-3, and *theta*
     /// is the observer angle relative to the magnetic field direction in
     /// radians.
-    fn compute_cgs(&mut self, coeff: Coefficient, stokes: Stokes,
+    fn compute_cgs(&self, coeff: Coefficient, stokes: Stokes,
                    nu: f64, b: f64, n_e: f64, theta: f64) -> f64 {
         let nu_c = ELECTRON_CHARGE * b / (TWO_PI * MASS_ELECTRON * SPEED_LIGHT);
         let val = self.compute_dimensionless(coeff, stokes, nu / nu_c, theta);
@@ -122,7 +122,7 @@ pub trait SynchrotronCalculator {
 
     /// Compute all six coefficients in their dimensionless form. The return
     /// value is an array of `[j_i, alpha_i, j_q, alpha_q, j_v, alpha_v]`.
-    fn compute_all_dimensionless(&mut self, s: f64, theta: f64) -> [f64; 6] {
+    fn compute_all_dimensionless(&self, s: f64, theta: f64) -> [f64; 6] {
         let mut rv = [0_f64; 6];
 
         rv[0] = self.compute_dimensionless(Coefficient::Emission, Stokes::I, s, theta);
@@ -137,7 +137,7 @@ pub trait SynchrotronCalculator {
 
     /// Compute all six coefficients in their cgs form. The return
     /// value is an array of `[j_i, alpha_i, j_q, alpha_q, j_v, alpha_v]`.
-    fn compute_all_cgs(&mut self, nu: f64, b: f64, n_e: f64, theta: f64) -> [f64; 6] {
+    fn compute_all_cgs(&self, nu: f64, b: f64, n_e: f64, theta: f64) -> [f64; 6] {
         let mut rv = [0_f64; 6];
 
         rv[0] = self.compute_cgs(Coefficient::Emission, Stokes::I, nu, b, n_e,  theta);
@@ -180,7 +180,7 @@ struct FullCalculationState<'a, D: 'a> {
 }
 
 impl<D: DistributionFunction> SynchrotronCalculator for FullSynchrotronCalculator<D> {
-    fn compute_dimensionless(&mut self, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> f64 {
+    fn compute_dimensionless(&self, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> f64 {
         FullCalculationState {
             d: &self.0,
             coeff: coeff,
