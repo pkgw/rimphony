@@ -198,9 +198,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         let mut gamma_workspace = gsl::IntegrationWorkspace::new(5000);
 
         for n in ((n_minus + 1.) as i64)..((n_minus + 1. + N_MAX) as i64) {
-            let r = self.gamma_integral(&mut gamma_workspace, n as f64);
-            ans += r;
-            //println!("discrete {} {:.6e}", n, r);
+            ans += self.gamma_integral(&mut gamma_workspace, n as f64);
         }
 
         // Now integrate the remaining n's, pretending that n can assume any
@@ -230,11 +228,12 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         // integrals.
         //
         // There's a term of `gamma^2 beta m_e^3 c^3` that plays a role in
-        // doing a unit conversion in the integrals. We divide out this term
-        // inside the distribution function and multiply it back in inside the
-        // integral. **NOTE** that for absorption coefficients we take the
-        // derivative with regards to gamma in between these steps, which is
-        // why we don't just remove the superfluous operations. For now.
+        // doing a unit conversion in the integrals. We divide out the
+        // non-constant parts of this term inside the distribution function
+        // and multiply it back in inside the integral. **NOTE** that for
+        // absorption coefficients we take the derivative with regards to
+        // gamma in between these steps, which is why we don't just remove the
+        // superfluous operations. For now.
         //
         // There is also a term of `2 pi` that comes from assuming gyrotropy,
         // i.e. uniformity in electron azimuth angle.
@@ -250,15 +249,14 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         //
         // Collecting the terms that aren't gamma or beta:
 
-        let tmp = (MASS_ELECTRON * SPEED_LIGHT).powi(3);
-
-        ans / tmp * match self.coeff {
+        ans * match self.coeff {
             Coefficient::Emission(_) => {
-                (TWO_PI * ELECTRON_CHARGE * SPEED_LIGHT).powi(2) * MASS_ELECTRON.powi(3) * self.nu / self.cos_observer_angle.abs()
+                (TWO_PI * ELECTRON_CHARGE).powi(2) * self.nu /
+                    (SPEED_LIGHT * self.cos_observer_angle.abs())
             },
             Coefficient::Absorption(_) => {
-                -1. * (TWO_PI * ELECTRON_CHARGE * MASS_ELECTRON * SPEED_LIGHT).powi(2) /
-                    (2. * self.nu * self.cos_observer_angle.abs())
+                -1. * (TWO_PI * ELECTRON_CHARGE).powi(2) /
+                    (2. * MASS_ELECTRON * SPEED_LIGHT * self.nu * self.cos_observer_angle.abs())
             },
         }
     }
@@ -308,7 +306,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
                 .rule(gsl::IntegrationRule::GaussKonrod31)
                 .compute()
                 .map(|r| r.value)?;
-            //println!("NI {:.6e} {:.6e} {:.6e} {:.6e} {:.6e}", n_start, n_start + delta_n, contrib, deriv, deriv / contrib);
+
             ans += contrib;
             n_start += delta_n;
         }
