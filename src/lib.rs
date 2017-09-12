@@ -83,7 +83,7 @@ pub struct PowerLawDistribution {
 
     gamma_min: f64,
     gamma_max: f64,
-    gamma_cutoff: f64,
+    inv_gamma_cutoff: f64,
 
     norm: f64,
 }
@@ -95,7 +95,7 @@ impl PowerLawDistribution {
             p: p,
             gamma_min: 1.,
             gamma_max: 1e12,
-            gamma_cutoff: 1e10,
+            inv_gamma_cutoff: 1e-10,
             norm: f64::NAN,
         }
     }
@@ -103,7 +103,7 @@ impl PowerLawDistribution {
     pub fn gamma_limits(mut self, gamma_min: f64, gamma_max: f64, gamma_cutoff: f64) -> Self {
         self.gamma_min = gamma_min;
         self.gamma_max = gamma_max;
-        self.gamma_cutoff = gamma_cutoff;
+        self.inv_gamma_cutoff = 1. / gamma_cutoff;
         self
     }
 
@@ -111,7 +111,7 @@ impl PowerLawDistribution {
         // Compute the normalization factor.
 
         let mut ws = gsl::IntegrationWorkspace::new(1000);
-        let integral = ws.qag(|g| g.powf(-self.p) * (-g / self.gamma_cutoff).exp(),
+        let integral = ws.qag(|g| g.powf(-self.p) * (-g * self.inv_gamma_cutoff).exp(),
                               self.gamma_min, self.gamma_max)
             .tolerance(0., 1e-8)
             .rule(gsl::IntegrationRule::GaussKonrod31)
@@ -177,7 +177,7 @@ impl DistributionFunction for SynchrotronCalculator<PowerLawDistribution> {
         } else {
             let beta = (1. - 1. / (gamma * gamma)).sqrt();
 
-            self.d.norm * gamma.powf(-self.d.p) * (-gamma / self.d.gamma_cutoff).exp()
+            self.d.norm * gamma.powf(-self.d.p) * (-gamma * self.d.inv_gamma_cutoff).exp()
                 / (gamma * gamma * beta)
         }
     }
