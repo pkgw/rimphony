@@ -365,33 +365,11 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
     fn gamma_integrand(&mut self, gamma: f64, n: f64) -> f64 {
         /* from integrands.c */
 
-        let beta = (1. - 1. / (gamma * gamma)).sqrt();
+        // First, compute the term that depends on which polarization we're
+        // talking about. NOTE: Leung et al. (2011) has the wrong sign for
+        // Stokes V in its equations, where "wrong" means "not the IEEE/IAU
+        // convention". We do it right below.
 
-        let ans = match self.coeff {
-            Coefficient::Emission(_) => {
-                let func_i = TWO_PI * (ELECTRON_CHARGE * self.nu).powi(2) / SPEED_LIGHT
-                    * (MASS_ELECTRON * SPEED_LIGHT).powi(3) * gamma * gamma * beta * TWO_PI
-                    * self.calc_f(gamma) * self.polarization_term(gamma, n);
-                let prefactor = 1. / (self.nu * beta * self.observer_angle.cos().abs());
-                prefactor * func_i
-            },
-            Coefficient::Absorption(_) => {
-                let prefactor = -SPEED_LIGHT * ELECTRON_CHARGE * ELECTRON_CHARGE / (2. * self.nu);
-                prefactor * gamma * gamma * beta * self.numerical_differential_of_f(gamma) *
-                    self.polarization_term(gamma, n) / (self.nu * beta * self.observer_angle.cos().abs())
-            }
-        };
-
-        if ans.is_finite() {
-            ans
-        } else {
-            0.
-        }
-    }
-
-    #[inline]
-    fn polarization_term(&mut self, gamma: f64, n: f64) -> f64 {
-        /* from integrands.c */
         let beta = (1. - 1. / (gamma * gamma)).sqrt();
         let cos_xi = (gamma * self.nu - n * self.nu_c) / (gamma * self.nu * beta * self.observer_angle.cos());
         let m = (self.observer_angle.cos() - beta * cos_xi) / self.observer_angle.sin();
@@ -400,14 +378,34 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         let k_xx = m * m * leung_bessel::Jn(n, z).powi(2);
         let k_yy = big_n * big_n * leung_bessel::Jn_prime(n, z).powi(2);
 
-        // NOTE: Leung et al. (2011) has the wrong sign for Stokes V in its
-        // equations, where "wrong" means "not the IEEE/IAU convention". We do
-        // it right below.
-
-        match self.coeff.stokes() {
+        let pol_term = match self.coeff.stokes() {
             Stokes::I => k_xx + k_yy,
             Stokes::Q => k_xx - k_yy,
             Stokes::V => 2. * m * big_n * leung_bessel::Jn(n, z) * leung_bessel::Jn_prime(n, z),
+        };
+
+        // The other bit of the computation depends on on whether we're
+        // looking at emission or absorption.
+
+        let ans = match self.coeff {
+            Coefficient::Emission(_) => {
+                let func_i = TWO_PI * (ELECTRON_CHARGE * self.nu).powi(2) / SPEED_LIGHT
+                    * (MASS_ELECTRON * SPEED_LIGHT).powi(3) * gamma * gamma * beta * TWO_PI
+                    * self.calc_f(gamma) * pol_term;
+                let prefactor = 1. / (self.nu * beta * self.observer_angle.cos().abs());
+                prefactor * func_i
+            },
+            Coefficient::Absorption(_) => {
+                let prefactor = -SPEED_LIGHT * ELECTRON_CHARGE * ELECTRON_CHARGE / (2. * self.nu);
+                prefactor * gamma * gamma * beta * self.numerical_differential_of_f(gamma) *
+                    pol_term / (self.nu * beta * self.observer_angle.cos().abs())
+            }
+        };
+
+        if ans.is_finite() {
+            ans
+        } else {
+            0.
         }
     }
 
