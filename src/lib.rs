@@ -308,8 +308,11 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         }
 
         while contrib.abs() >= (ans / TOLERANCE).abs() {
-            // Evaluate the derivative of the gamma integral with regards to n to figure out
-            // the size of the steps we should be taking.
+            // Evaluate the derivative of the gamma integral with regards to n
+            // to figure out the size of the steps we should be taking. Here
+            // we've modified Symphony's algorithm to compare `deriv` to
+            // `contrib`; otherwise its values are dimensional and can change
+            // substantially if we change the units of the integrand.
 
             let deriv = gsl::deriv_central(|n| self.gamma_integral(&mut gamma_workspace, n), n_start, 1e-8)
                 .map(|r| r.value)?;
