@@ -119,7 +119,38 @@ pub trait SynchrotronCalculator {
             Coefficient::Absorption => val * n_e / nu,
         }
     }
+
+    /// Compute all six coefficients in their dimensionless form. The return
+    /// value is an array of `[j_i, alpha_i, j_q, alpha_q, j_v, alpha_v]`.
+    fn compute_all_dimensionless(&mut self, s: f64, theta: f64) -> [f64; 6] {
+        let mut rv = [0_f64; 6];
+
+        rv[0] = self.compute_dimensionless(Coefficient::Emission, Stokes::I, s, theta);
+        rv[1] = self.compute_dimensionless(Coefficient::Absorption, Stokes::I, s, theta);
+        rv[2] = self.compute_dimensionless(Coefficient::Emission, Stokes::Q, s, theta);
+        rv[3] = self.compute_dimensionless(Coefficient::Absorption, Stokes::Q, s, theta);
+        rv[4] = self.compute_dimensionless(Coefficient::Emission, Stokes::V, s, theta);
+        rv[5] = self.compute_dimensionless(Coefficient::Absorption, Stokes::V, s, theta);
+
+        rv
+    }
+
+    /// Compute all six coefficients in their cgs form. The return
+    /// value is an array of `[j_i, alpha_i, j_q, alpha_q, j_v, alpha_v]`.
+    fn compute_all_cgs(&mut self, nu: f64, b: f64, n_e: f64, theta: f64) -> [f64; 6] {
+        let mut rv = [0_f64; 6];
+
+        rv[0] = self.compute_cgs(Coefficient::Emission, Stokes::I, nu, b, n_e,  theta);
+        rv[1] = self.compute_cgs(Coefficient::Absorption, Stokes::I, nu, b, n_e,  theta);
+        rv[2] = self.compute_cgs(Coefficient::Emission, Stokes::Q, nu, b, n_e,  theta);
+        rv[3] = self.compute_cgs(Coefficient::Absorption, Stokes::Q, nu, b, n_e,  theta);
+        rv[4] = self.compute_cgs(Coefficient::Emission, Stokes::V, nu, b, n_e,  theta);
+        rv[5] = self.compute_cgs(Coefficient::Absorption, Stokes::V, nu, b, n_e,  theta);
+
+        rv
+    }
 }
+
 
 // Distributions
 
