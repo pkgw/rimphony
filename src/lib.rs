@@ -10,6 +10,12 @@ DOI:10.3847/0004-637X/822/1/34](https://dx.doi.org/10.3847/0004-637X/822/1/34)
 and [Leung, Gammie, and Noble
 (2011)](https://dx.doi.org/10.1088/0004-637X/737/1/21).
 
+The basic structure of the problem is that we need to do an integral in a 2D
+quarter-plane defined by the variables *gamma* (>= 1) and *n* (>= 1).
+Technically, *n* can only take on discrete values, but we generally have to
+integrate over very large values of *n* such that we can treat it as being
+continous.
+
 */
 
 extern crate gsl_sys;
@@ -291,6 +297,9 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         Ok(ans)
     }
 
+    /// Integrate across different values of gamma at a fixed single value of
+    /// *n*. The equations are such that we can identify where the maximum of
+    /// the integral should be and its approximate width.
     fn gamma_integral(&mut self, workspace: &mut gsl::IntegrationWorkspace, n: f64) -> f64 {
         /* Formerly `gamma_integration_result` from Symphony's integrate.c */
 
@@ -352,6 +361,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             .unwrap_or(0.)
     }
 
+    /// Calculate the contribution at specific values of *gamma* and *n*.
     fn gamma_integrand(&mut self, gamma: f64, n: f64) -> f64 {
         /* from integrands.c */
 
