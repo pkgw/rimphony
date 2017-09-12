@@ -166,17 +166,18 @@ pub trait DistributionFunction {
     /// Symphony, isotropy and gyrotropy are assumed, so the `d(cos xi)
     /// d(phi)` become 1/4pi. The funny scalings are due to me being stuck on
     /// the numerical derivative step. To be revisited.
-    fn calc_f(&mut self, gamma: f64) -> f64;
+    fn calc_f(&mut self, gamma: f64, cos_xi: f64) -> f64;
 
-    /// The derivative of `calc_f` with regards to `gamma`. This must include
-    /// the derivative with regards to the `1 / (gamma^2 beta)` factor that
-    /// turns the gamma/cos xi/phi coordinates into p^3 coordinates.
-    fn calc_dfdg(&mut self, gamma: f64) -> f64;
+    /// The derivative of `calc_f` with regards to `gamma` and `cos_xi`. This
+    /// must include the derivative with regards to the `1 / (gamma^2 beta)`
+    /// factor that turns the gamma/cos xi/phi coordinates into p^3
+    /// coordinates.
+    fn calc_f_derivatives(&mut self, gamma: f64, cos_xi: f64) -> (f64, f64);
 }
 
 
 impl DistributionFunction for SynchrotronCalculator<PowerLawDistribution> {
-    fn calc_f(&mut self, gamma: f64) -> f64 {
+    fn calc_f(&mut self, gamma: f64, _cos_xi: f64) -> f64 {
         if gamma < self.d.gamma_min || gamma > self.d.gamma_max {
             0.
         } else {
@@ -187,17 +188,19 @@ impl DistributionFunction for SynchrotronCalculator<PowerLawDistribution> {
         }
     }
 
-    fn calc_dfdg(&mut self, gamma: f64) -> f64 {
+    fn calc_f_derivatives(&mut self, gamma: f64, _cos_xi: f64) -> (f64, f64) {
         if gamma < self.d.gamma_min || gamma > self.d.gamma_max {
-            return 0.;
+            return (0., 0.);
         }
 
         let p_plus_1 = self.d.p + 1.;
         let g2_minus_1 = gamma * gamma - 1.;
-
-        -self.d.norm * gamma.powf(-p_plus_1) / g2_minus_1.sqrt() *
+        let dfdg = -self.d.norm * gamma.powf(-p_plus_1) / g2_minus_1.sqrt() *
             (-gamma * self.d.inv_gamma_cutoff).exp() *
-            (p_plus_1 / gamma + gamma / g2_minus_1 + self.d.inv_gamma_cutoff)
+            (p_plus_1 / gamma + gamma / g2_minus_1 + self.d.inv_gamma_cutoff);
+        let dfdcx = 0.;
+
+        (dfdg, dfdcx)
     }
 }
 
@@ -426,8 +429,12 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         // papers can be pulled out of the integral.
 
         let ans = match self.coeff {
-            Coefficient::Emission(_) => gamma * gamma * self.calc_f(gamma) * pol_term,
-            Coefficient::Absorption(_) => gamma * gamma * self.calc_dfdg(gamma) * pol_term,
+            Coefficient::Emission(_) => gamma * gamma * self.calc_f(gamma, cos_xi) * pol_term,
+            Coefficient::Absorption(_) => {
+                let (dfdg, dfdcx) = self.calc_f_derivatives(gamma, cos_xi);
+                let xi_factor = (beta * self.cos_observer_angle - cos_xi) / (gamma - 1. / gamma);
+                gamma * gamma * (dfdg + xi_factor * dfdcx) * pol_term
+            },
         };
 
         if ans.is_finite() {
