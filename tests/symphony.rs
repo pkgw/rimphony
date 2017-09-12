@@ -12,6 +12,7 @@ use rimphony::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI, Coefficient,
 use std::io::{BufRead, BufReader};
 use std::fs::File;
 use std::path::PathBuf;
+use std::time::Instant;
 
 const TOP: &'static str = env!("CARGO_MANIFEST_DIR");
 
@@ -24,8 +25,8 @@ fn compare_powerlaw_subset(coeff: rimphony::Coefficient, cname: &str, index: usi
     const NU: f64 = 1e9;
     const N_E: f64 = 1.;
     const GAMMA_MIN: f64 = 1.;
-    const GAMMA_MAX: f64 = 1000.;
-    const GAMMA_CUTOFF: f64 = 1e7;
+    const GAMMA_MAX: f64 = 1e12;
+    const GAMMA_CUTOFF: f64 = 1e10;
 
     let re = regex::Regex::new(r"\s+").unwrap();
 
@@ -46,10 +47,19 @@ fn compare_powerlaw_subset(coeff: rimphony::Coefficient, cname: &str, index: usi
         let p = v[2];
         let bfield = TWO_PI * MASS_ELECTRON * SPEED_LIGHT * NU / (ELECTRON_CHARGE * s);
 
+        let t0 = Instant::now();
         let ours = rimphony::PowerLawDistribution::new(p)
             .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
             .finish(coeff, NU, bfield, N_E, theta)
             .compute();
+
+        let elapsed = t0.elapsed();
+        if elapsed.as_secs() > 3 {
+            println!("SLOW: c = {:?} s = {:.10e} theta = {:.10e} p = {:.10e} elapsed = {:.0} ms",
+                     coeff, s, theta, p,
+                     elapsed.as_secs() as f64 * 1000. + elapsed.subsec_nanos() as f64 * 1e-6);
+        }
+
         let theirs = v[index];
         let rel_err = ((ours - theirs) / theirs).abs();
 
@@ -73,7 +83,6 @@ fn compare_powerlaw_subset_jq() {
     compare_powerlaw_subset(Coefficient::Emission(Stokes::Q), "J_Q", 5, 0.03, 0.01);
 }
 
-/// Stokes V is a bit more demanding so the error threshold is looser.
 #[test]
 fn compare_powerlaw_subset_jv() {
     compare_powerlaw_subset(Coefficient::Emission(Stokes::V), "J_V", 7, 0.03, 0.01);
@@ -89,7 +98,6 @@ fn compare_powerlaw_subset_aq() {
     compare_powerlaw_subset(Coefficient::Absorption(Stokes::Q), "A_Q", 6, 0.03, 0.01);
 }
 
-/// Stokes V is a bit more demanding so the error threshold is looser.
 #[test]
 fn compare_powerlaw_subset_av() {
     compare_powerlaw_subset(Coefficient::Absorption(Stokes::V), "A_V", 8, 0.03, 0.01);
