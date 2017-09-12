@@ -222,3 +222,10 @@ pub fn deriv_central<F>(mut f: F, x: f64, h: f64) -> GslResult<IntegrationResult
         Ok(IntegrationResult { value: result, abserr: abserr })
     }
 }
+
+
+/// Compute the 2F1 hypergeometric function.
+#[allow(non_snake_case)]
+pub fn hypergeometric_2F1(a: f64, b: f64, c: f64, x: f64) -> f64 {
+    unsafe { gsl_sys::gsl_sf_hyperg_2F1(a, b, c, x) }
+}
