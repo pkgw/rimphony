@@ -372,16 +372,17 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
 
         let beta = (1. - 1. / (gamma * gamma)).sqrt();
         let cos_xi = (gamma - n / self.s) / (gamma * beta * self.cos_observer_angle);
+        let sin_xi = (1. - cos_xi * cos_xi).sqrt();
         let m = (self.cos_observer_angle - beta * cos_xi) / self.sin_observer_angle;
-        let big_n = beta * (1. - cos_xi * cos_xi).sqrt();
-        let z = self.s * gamma * beta * self.sin_observer_angle * (1. - cos_xi * cos_xi).sqrt();
-        let k_xx = m * m * leung_bessel::Jn(n, z).powi(2);
-        let k_yy = big_n * big_n * leung_bessel::Jn_prime(n, z).powi(2);
+        let big_n = beta * sin_xi;
+        let z = self.s * gamma * beta * self.sin_observer_angle * sin_xi;
+        let mj = m * leung_bessel::Jn(n, z);
+        let njp = big_n * leung_bessel::Jn_prime(n, z);
 
         let pol_term = match self.coeff.stokes() {
-            Stokes::I => k_xx + k_yy,
-            Stokes::Q => k_xx - k_yy,
-            Stokes::V => 2. * m * big_n * leung_bessel::Jn(n, z) * leung_bessel::Jn_prime(n, z),
+            Stokes::I => mj * mj + njp * njp,
+            Stokes::Q => mj * mj - njp * njp,
+            Stokes::V => 2. * mj * njp,
         };
 
         // The other bit of the computation depends on on whether we're
