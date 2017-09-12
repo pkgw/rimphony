@@ -239,9 +239,37 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             }
         }
 
-        // And that's it.
+        // Finally, apply the dimensional constants that don't vary inside any of the
+        // integrals.
+        //
+        // For both emission and absorption, there's a term of `gamma^2 beta m_e^3 c^3`
+        // that comes from the coordinate transform of the distribution function; see
+        // Pandya+ (2016) equation 14.
+        //
+        // There is also a term of `2 pi` that comes from assuming gyrotropy,
+        // i.e. uniformity in electron azimuth angle.
+        //
+        // There is also a term of 1. / (nu beta |cos theta|) that comes from
+        // integrating over the delta function of the resonance condition; see Leung
+        // et al. (2011), equation 62.
+        //
+        // For emission, the physics-based prefactor is `2 pi e^2 nu^2 / c`.
+        //
+        // For absorption, there's a physics-based prefactor of `-c e^2 / 2 nu`
+        // (Pandya equation 12) and one of `2 pi nu / me c^2` (Pandya equation 13).
+        //
+        // Collecting the terms that aren't gamma or beta:
 
-        ans
+        ans * match self.coeff {
+            Coefficient::Emission(_) => {
+                (TWO_PI * ELECTRON_CHARGE * MASS_ELECTRON * SPEED_LIGHT).powi(2) *
+                    MASS_ELECTRON * self.nu / self.cos_observer_angle.abs()
+            },
+            Coefficient::Absorption(_) => {
+                -1. * (TWO_PI * ELECTRON_CHARGE * MASS_ELECTRON * SPEED_LIGHT).powi(2) /
+                    (2. * self.nu * self.cos_observer_angle.abs())
+            },
+        }
     }
 
     /// Compute the contributions to the integration from the region in the
@@ -386,20 +414,16 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         };
 
         // The other bit of the computation depends on on whether we're
-        // looking at emission or absorption.
+        // looking at emission or absorption. See the bottom of self.compute()
+        // for explanations of the prefactors; almost all of the ones in the
+        // papers can be pulled out of the integral.
 
         let ans = match self.coeff {
             Coefficient::Emission(_) => {
-                let func_i = TWO_PI * (ELECTRON_CHARGE * self.nu).powi(2) / SPEED_LIGHT
-                    * (MASS_ELECTRON * SPEED_LIGHT).powi(3) * gamma * gamma * beta * TWO_PI
-                    * self.calc_f(gamma) * pol_term;
-                let prefactor = 1. / (self.nu * beta * self.cos_observer_angle.abs());
-                prefactor * func_i
+                gamma * gamma * self.calc_f(gamma) * pol_term
             },
             Coefficient::Absorption(_) => {
-                let prefactor = -SPEED_LIGHT * ELECTRON_CHARGE * ELECTRON_CHARGE / (2. * self.nu);
-                prefactor * gamma * gamma * beta * self.numerical_differential_of_f(gamma) *
-                    pol_term / (self.nu * beta * self.cos_observer_angle.abs())
+                gamma * gamma * self.numerical_differential_of_f(gamma) * pol_term
             }
         };
 
@@ -413,15 +437,10 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
     fn numerical_differential_of_f(&mut self, gamma: f64) -> f64 {
         /* from distribution_function_common_routines.c */
         const EPSILON: f64 = 3e-4;
-        const GYROPHASE_INDEP: f64 = TWO_PI;
-        const _TMP: f64 = MASS_ELECTRON * SPEED_LIGHT;
-        const D3P_TO_GAMMA: f64 = _TMP * _TMP * _TMP; // can't powi() for a const
-        let prefactor = TWO_PI * self.nu / (MASS_ELECTRON * SPEED_LIGHT * SPEED_LIGHT) *
-            GYROPHASE_INDEP * D3P_TO_GAMMA;
 
         let f_plus = self.calc_f(gamma + EPSILON);
 
-        let df = if f_plus.is_nan() {
+        if f_plus.is_nan() {
             (self.calc_f(gamma) - self.calc_f(gamma - EPSILON)) / EPSILON
         } else {
             let f_minus = self.calc_f(gamma - EPSILON);
@@ -431,9 +450,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
             } else {
                 (f_plus - f_minus) / (2. * EPSILON)
             }
-        };
-
-        prefactor * df
+        }
     }
 
     /// A generic helper that the distribution functions can use.
