@@ -82,7 +82,11 @@ impl PowerLawDistribution {
     /// calculator will use the full, detailed double integral calculation to
     /// evaluate all coefficients.
     pub fn full_calculation(mut self) -> FullSynchrotronCalculator<Self> {
-        // Compute the normalization factor.
+        // Compute the normalization factor. Note that here we do *not*
+        // include the 1. / (gamma^2 beta) term that we include when
+        // evaluating the distribution function. I'll admit that I'm not 100%
+        // clear on what's going on here but this is what gets us to agree
+        // with Symphony and its asymptotic fits.
 
         let mut ws = gsl::IntegrationWorkspace::new(1000);
         let integral = ws.qag(|g| g.powf(-self.p) * (-g * self.inv_gamma_cutoff).exp(),

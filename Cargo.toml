@@ -11,6 +11,7 @@ gsl-sys = { path = "gsl-sys" }
 leung-bessel = { path = "leung-bessel" }
 
 [dev-dependencies]
+assert_approx_eq = "^1.0"
 bencher = "^0.1"
 rand = "^0.3"
 regex = "^0.2"

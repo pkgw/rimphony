@@ -23,6 +23,9 @@ continous.
 extern crate gsl_sys;
 extern crate leung_bessel;
 
+#[cfg(test)]
+#[macro_use] extern crate assert_approx_eq;
+
 use std::f64;
 
 mod gsl;
@@ -153,6 +156,9 @@ pub trait SynchrotronCalculator {
 
 pub mod power_law;
 pub use power_law::PowerLawDistribution;
+
+pub mod pitchy_pl;
+pub use pitchy_pl::PitchyPowerLawDistribution;
 
 
 /// The FullSunchrotronCalculator implements the fully detailed
