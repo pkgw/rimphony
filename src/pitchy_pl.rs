@@ -12,8 +12,8 @@ use gsl;
 use super::{TWO_PI, DistributionFunction, FullSynchrotronCalculator};
 
 
-/// Parameters for a power-law electron distribution. See the module-level
-/// documentation for details.
+/// Parameters for a power-law electron distribution with a sin(pitch-angle)
+/// dependence. See the module-level documentation for details.
 pub struct PitchyPowerLawDistribution {
     p: f64,
     k: f64,
@@ -84,7 +84,7 @@ impl PitchyPowerLawDistribution {
         self
     }
 
-    /// Create a SynchrotronCalculator from this set of paramaters. The
+    /// Create a SynchrotronCalculator from this set of parameters. The
     /// calculator will use the full, detailed double integral calculation to
     /// evaluate all coefficients.
     pub fn full_calculation(mut self) -> FullSynchrotronCalculator<Self> {

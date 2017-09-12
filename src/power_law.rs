@@ -78,7 +78,7 @@ impl PowerLawDistribution {
         self
     }
 
-    /// Create a SynchrotronCalculator from this set of paramaters. The
+    /// Create a SynchrotronCalculator from this set of parameters. The
     /// calculator will use the full, detailed double integral calculation to
     /// evaluate all coefficients.
     pub fn full_calculation(mut self) -> FullSynchrotronCalculator<Self> {
