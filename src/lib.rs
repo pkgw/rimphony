@@ -428,12 +428,12 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         // for explanations of the prefactors; almost all of the ones in the
         // papers can be pulled out of the integral.
 
-        let ans = match self.coeff {
-            Coefficient::Emission(_) => gamma * gamma * self.calc_f(gamma, cos_xi) * pol_term,
+        let ans = gamma * gamma * pol_term * match self.coeff {
+            Coefficient::Emission(_) => self.calc_f(gamma, cos_xi),
             Coefficient::Absorption(_) => {
                 let (dfdg, dfdcx) = self.calc_f_derivatives(gamma, cos_xi);
-                let xi_factor = (beta * self.cos_observer_angle - cos_xi) / (gamma - 1. / gamma);
-                gamma * gamma * (dfdg + xi_factor * dfdcx) * pol_term
+                let dfdcx_factor = (beta * self.cos_observer_angle - cos_xi) / (gamma - 1. / gamma);
+                dfdg + dfdcx_factor * dfdcx
             },
         };
 
