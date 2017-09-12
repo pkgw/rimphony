@@ -118,7 +118,8 @@ impl PowerLawDistribution {
             nu: nu,
             magnetic_field: b,
             electron_density: n_e,
-            observer_angle: theta,
+            cos_observer_angle: theta.cos(),
+            sin_observer_angle: theta.sin(),
             d: self,
             nu_c: f64::NAN,
             stokes_v_switch: StokesVSwitch::Inactive,
@@ -140,7 +141,8 @@ pub struct SynchrotronCalculator<D> {
     nu: f64,
     magnetic_field: f64,
     electron_density: f64,
-    observer_angle: f64,
+    cos_observer_angle: f64,
+    sin_observer_angle: f64,
 
     d: D,
 
@@ -207,7 +209,7 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
 
         // Calculate the contributions from the first 30 n's discretely.
 
-        let n_minus = (self.nu / self.nu_c) * self.observer_angle.sin().abs();
+        let n_minus = (self.nu / self.nu_c) * self.sin_observer_angle.abs();
 
         self.stokes_v_switch = StokesVSwitch::Inactive;
         let mut gamma_workspace = gsl::IntegrationWorkspace::new(5000);
@@ -304,14 +306,14 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         /* Formerly `gamma_integration_result` from Symphony's integrate.c */
 
         let gamma_minus = ((n * self.nu_c) / self.nu -
-                           self.observer_angle.cos().abs() *
-                           ((n * self.nu_c / self.nu).powi(2) - self.observer_angle.sin().powi(2)).sqrt()
-        ) / self.observer_angle.sin().powi(2);
+                           self.cos_observer_angle.abs() *
+                           ((n * self.nu_c / self.nu).powi(2) - self.sin_observer_angle.powi(2)).sqrt()
+        ) / self.sin_observer_angle.powi(2);
 
         let gamma_plus = ((n * self.nu_c) / self.nu +
-                           self.observer_angle.cos().abs() *
-                           ((n * self.nu_c / self.nu).powi(2) - self.observer_angle.sin().powi(2)).sqrt()
-        ) / self.observer_angle.sin().powi(2);
+                           self.cos_observer_angle.abs() *
+                           ((n * self.nu_c / self.nu).powi(2) - self.sin_observer_angle.powi(2)).sqrt()
+        ) / self.sin_observer_angle.powi(2);
 
         let gamma_peak = 0.5 * (gamma_plus + gamma_minus);
 
@@ -371,10 +373,10 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
         // convention". We do it right below.
 
         let beta = (1. - 1. / (gamma * gamma)).sqrt();
-        let cos_xi = (gamma * self.nu - n * self.nu_c) / (gamma * self.nu * beta * self.observer_angle.cos());
-        let m = (self.observer_angle.cos() - beta * cos_xi) / self.observer_angle.sin();
+        let cos_xi = (gamma * self.nu - n * self.nu_c) / (gamma * self.nu * beta * self.cos_observer_angle);
+        let m = (self.cos_observer_angle - beta * cos_xi) / self.sin_observer_angle;
         let big_n = beta * (1. - cos_xi * cos_xi).sqrt();
-        let z = self.nu * gamma * beta * self.observer_angle.sin() * (1. - cos_xi * cos_xi).sqrt() / self.nu_c;
+        let z = self.nu * gamma * beta * self.sin_observer_angle * (1. - cos_xi * cos_xi).sqrt() / self.nu_c;
         let k_xx = m * m * leung_bessel::Jn(n, z).powi(2);
         let k_yy = big_n * big_n * leung_bessel::Jn_prime(n, z).powi(2);
 
@@ -392,13 +394,13 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
                 let func_i = TWO_PI * (ELECTRON_CHARGE * self.nu).powi(2) / SPEED_LIGHT
                     * (MASS_ELECTRON * SPEED_LIGHT).powi(3) * gamma * gamma * beta * TWO_PI
                     * self.calc_f(gamma) * pol_term;
-                let prefactor = 1. / (self.nu * beta * self.observer_angle.cos().abs());
+                let prefactor = 1. / (self.nu * beta * self.cos_observer_angle.abs());
                 prefactor * func_i
             },
             Coefficient::Absorption(_) => {
                 let prefactor = -SPEED_LIGHT * ELECTRON_CHARGE * ELECTRON_CHARGE / (2. * self.nu);
                 prefactor * gamma * gamma * beta * self.numerical_differential_of_f(gamma) *
-                    pol_term / (self.nu * beta * self.observer_angle.cos().abs())
+                    pol_term / (self.nu * beta * self.cos_observer_angle.abs())
             }
         };
 
