@@ -167,6 +167,11 @@ pub trait DistributionFunction {
     /// d(phi)` become 1/4pi. The funny scalings are due to me being stuck on
     /// the numerical derivative step. To be revisited.
     fn calc_f(&mut self, gamma: f64) -> f64;
+
+    /// The derivative of `calc_f` with regards to `gamma`. This must include
+    /// the derivative with regards to the `1 / (gamma^2 beta)` factor that
+    /// turns the gamma/cos xi/phi coordinates into p^3 coordinates.
+    fn calc_dfdg(&mut self, gamma: f64) -> f64;
 }
 
 
@@ -180,6 +185,19 @@ impl DistributionFunction for SynchrotronCalculator<PowerLawDistribution> {
             self.d.norm * gamma.powf(-self.d.p) * (-gamma * self.d.inv_gamma_cutoff).exp()
                 / (gamma * gamma * beta)
         }
+    }
+
+    fn calc_dfdg(&mut self, gamma: f64) -> f64 {
+        if gamma < self.d.gamma_min || gamma > self.d.gamma_max {
+            return 0.;
+        }
+
+        let p_plus_1 = self.d.p + 1.;
+        let g2_minus_1 = gamma * gamma - 1.;
+
+        -self.d.norm * gamma.powf(-p_plus_1) / g2_minus_1.sqrt() *
+            (-gamma * self.d.inv_gamma_cutoff).exp() *
+            (p_plus_1 / gamma + gamma / g2_minus_1 + self.d.inv_gamma_cutoff)
     }
 }
 
@@ -409,32 +427,13 @@ impl<D> SynchrotronCalculator<D> where Self: DistributionFunction {
 
         let ans = match self.coeff {
             Coefficient::Emission(_) => gamma * gamma * self.calc_f(gamma) * pol_term,
-            Coefficient::Absorption(_) => gamma * gamma * self.numerical_differential_of_f(gamma) * pol_term,
+            Coefficient::Absorption(_) => gamma * gamma * self.calc_dfdg(gamma) * pol_term,
         };
 
         if ans.is_finite() {
             ans
         } else {
             0.
-        }
-    }
-
-    fn numerical_differential_of_f(&mut self, gamma: f64) -> f64 {
-        /* from distribution_function_common_routines.c */
-        const EPSILON: f64 = 3e-4;
-
-        let f_plus = self.calc_f(gamma + EPSILON);
-
-        if f_plus.is_nan() {
-            (self.calc_f(gamma) - self.calc_f(gamma - EPSILON)) / EPSILON
-        } else {
-            let f_minus = self.calc_f(gamma - EPSILON);
-
-            if f_minus.is_nan() {
-                (f_plus - self.calc_f(gamma)) / EPSILON
-            } else {
-                (f_plus - f_minus) / (2. * EPSILON)
-            }
         }
     }
 }
