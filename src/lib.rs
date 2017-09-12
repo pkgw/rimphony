@@ -160,6 +160,7 @@ pub use power_law::PowerLawDistribution;
 
 /// The FullSunchrotronCalculator implements the fully detailed
 /// double-integral calculation.
+#[derive(Copy,Clone,Debug,Eq,Hash,PartialEq)]
 pub struct FullSynchrotronCalculator<D>(D);
 
 #[derive(Copy,Clone,Debug,Eq,Hash,PartialEq)]
@@ -169,6 +170,7 @@ enum StokesVSwitch {
     NegativeLobe,
 }
 
+#[derive(Copy,Clone,Debug,PartialEq)]
 struct FullCalculationState<'a, D: 'a> {
     d: &'a D,
     coeff: Coefficient,
