@@ -308,12 +308,15 @@ impl<'a, D: 'a + DistributionFunction> FullCalculationState<'a, D> {
             // to figure out the size of the steps we should be taking. Here
             // we've modified Symphony's algorithm to compare `deriv` to
             // `contrib`; otherwise its values are dimensional and can change
-            // substantially if we change the units of the integrand.
+            // substantially if we change the units of the integrand. If the
+            // only contributions come from very high n's, both `contrib` and
+            // `deriv` are zero, in which case we need to increase our step
+            // size.
 
             let deriv = gsl::deriv_central(|n| self.gamma_integral(&mut gamma_workspace, n), n_start, 1e-8)
                 .map(|r| r.value)?;
 
-            if contrib != 0. && (deriv / contrib).abs() < DERIV_TOL {
+            if deriv == 0. || (contrib != 0. && (deriv / contrib).abs() < DERIV_TOL) {
                 delta_n *= incr_step_factor;
             }
 
