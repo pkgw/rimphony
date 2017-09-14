@@ -15,6 +15,45 @@ because I thought that writing the program in Rust would make it a bit easier
 to experiment with some new features, such as pitch-angle dependences in the
 electron distribution functions. I feel that that is indeed the case.
 
+## Compiling and running it
+
+You need to have the Rust development tools installed.
+[Follow these easy instructions](https://www.rust-lang.org/install.html) if
+you don’t.
+
+You also need to have [GSL](https://www.gnu.org/software/gsl/) and its
+development files installed. This library is available on most OS’s and
+software packaging systems.
+
+Once Rust is available, hopefully all that is needed is to run
+
+```
+cargo build
+```
+
+and then
+
+```
+cargo test
+```
+
+to run the test programs. The command
+
+```
+cargo run --example one-powerlaw-direct
+```
+
+will compile and run a test program.
+
+To actually use this code for an application, you would need to write a
+program that depended on the Rimphony “crate” (a Rust term), used the relevant
+API calls, and did something with the results. For instance, the example
+program `crank-out-pitchypl` computes and prints coefficient values for random
+input parameters. I use these as training data for a neural network that can
+quickly compute approximate synchrotron coefficients for arbitrary input
+parameters.
+
+
 ## Structure
 
 The layout of the files in this repository follows standard Rust practices.
