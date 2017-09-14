@@ -8,7 +8,7 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let gsl = pkg_config::Config::new().atleast_version("2.0").probe("gsl").unwrap();
+    let gsl = pkg_config::Config::new().atleast_version("1.0").probe("gsl").unwrap();
 
     let mut builder = bindgen::Builder::default()
         .header("src/wrapper.h");
