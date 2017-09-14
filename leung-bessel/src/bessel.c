@@ -10,7 +10,7 @@
  * https://github.com/AFD-Illinois/symphony/. It has been tidied up by Peter
  * K. G. Williams.
  *
- * This version is distributed under the MIT License and is Copyright 2011 Po
+ * This version is distributed under the GPL version 3 and is Copyright 2011 Po
  * Kin Leung, 2016 Alex Pandya, and 2017 Peter Williams.
  */
 

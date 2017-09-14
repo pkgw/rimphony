@@ -1,3 +1,8 @@
+// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Licensed under the GPL version 3.
+
+/// Bindings just to the portions of GSL that we need.
+
 use gsl_sys;
 use std::error::Error;
 use std::f64;

@@ -1,3 +1,6 @@
+// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Licensed under the GPL version 3.
+
 /*! A power-law distribution function with a sine-power pitch angle dependence.
 
 This is an anisotropic power-law distribution. The energy dependence is the

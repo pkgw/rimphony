@@ -1,3 +1,6 @@
+// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Licensed under the GPL version 3.
+
 /// Crunch some numbers for in the powerlaw model.
 ///
 /// Due to the way it’s designed, the benchmarker runs each "iteration" at

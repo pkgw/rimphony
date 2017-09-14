@@ -1,7 +1,10 @@
+// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Licensed under the GPL version 3.
+
 /// Check our numbers against Symphony's.
 ///
 /// This test suite compares against a random subset of a larger database of
-/// examples computed with Symphony; this is a compromise between converage
+/// examples computed with Symphony; this is a compromise between coverage
 /// and runtime.
 
 extern crate rand;

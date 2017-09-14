@@ -1,3 +1,6 @@
+// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Licensed under the GPL version 3.
+
 /*!
 This crate provides a functions that can compute Bessel functions of large *n*
 very quickly.
