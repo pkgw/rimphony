@@ -11,7 +11,7 @@ fn main() {
     let gsl = pkg_config::Config::new().atleast_version("2.0").probe("gsl").unwrap();
 
     let mut builder = bindgen::Builder::default()
-        .header("wrapper.h");
+        .header("src/wrapper.h");
 
     for ref path in &gsl.include_paths {
         builder = builder.clang_arg(format!("-I{}", path.display()));
