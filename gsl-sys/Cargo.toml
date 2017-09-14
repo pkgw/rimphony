@@ -11,3 +11,4 @@ license = "MIT/Apache-2.0"
 
 [build-dependencies]
 bindgen = "0.26"
+pkg-config = "^0.3"

@@ -2,18 +2,22 @@
 // Licensed under the GPL version 3.
 
 extern crate bindgen;
+extern crate pkg_config;
 
 use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    println!("cargo:rustc-link-search=native=/a/lib");
-    println!("cargo:rustc-link-lib=dylib=gsl");
-    println!("cargo:rustc-link-lib=dylib=gslcblas");
+    let gsl = pkg_config::Config::new().atleast_version("2.0").probe("gsl").unwrap();
 
-    let bindings = bindgen::Builder::default()
-        .header("wrapper.h")
-        .clang_arg("-I/a/include") // heyoooo
+    let mut builder = bindgen::Builder::default()
+        .header("wrapper.h");
+
+    for ref path in &gsl.include_paths {
+        builder = builder.clang_arg(format!("-I{}", path.display()));
+    }
+    
+    let bindings = builder
         .whitelisted_type("gsl_.*")
         .whitelisted_function("gsl_.*")
         .generate()
