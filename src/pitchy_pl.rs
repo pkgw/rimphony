@@ -56,7 +56,7 @@ impl DistributionFunction for PitchyPowerLawDistribution {
         let f = self.norm * pa_term * gamma_term / (gamma * gamma * beta);
 
         let dfdg = -f * ((self.p + 1.) / gamma + gamma / (gamma * gamma - 1.) + self.inv_gamma_cutoff);
-        let dfdcx = f * self.k * cos_xi / sin_xi;
+        let dfdcx = -f * self.k * cos_xi / (sin_xi * sin_xi);
         (dfdg, dfdcx)
     }
 }
@@ -115,8 +115,10 @@ impl PitchyPowerLawDistribution {
 
 #[cfg(test)]
 mod test {
+    use std::f64;
+
     use super::PitchyPowerLawDistribution;
-    use ::{Coefficient, PowerLawDistribution, Stokes, SynchrotronCalculator};
+    use ::{Coefficient, DistributionFunction, PowerLawDistribution, Stokes, SynchrotronCalculator};
 
     // FIXME: basically copied from benches/powerlaw.rs.
 
@@ -181,5 +183,42 @@ mod test {
     #[test]
     fn k_zero_av() {
         test_k_zero(3, Coefficient::Absorption, Stokes::V);
+    }
+
+    #[test]
+    fn test_derivatives() {
+        use rand;
+        const EPS: f64 = 1e-6;
+        const TOL: f64 = 1e-4;
+
+        for _ in 0..100 {
+            let p = 2. + 3. * rand::random::<f64>();
+            let k = 0. + 3. * rand::random::<f64>();
+            let gamma = 1.1 + 1e3 * rand::random::<f64>();
+            let cos_xi = 0.01 + 0.98 * rand::random::<f64>();
+
+            let mut ppd = PitchyPowerLawDistribution::new(p, k);
+            ppd.norm = 1.; // fake this
+
+            let (analytic_dfdg, analytic_dfdcx) = ppd.calc_f_derivatives(gamma, cos_xi);
+
+            let f0 = ppd.calc_f(gamma, cos_xi);
+            let numeric_dfdg = (ppd.calc_f(gamma + EPS, cos_xi) - f0) / EPS;
+            let numeric_dfdcx = (ppd.calc_f(gamma, cos_xi + EPS) - f0) / EPS;
+
+            // The logical nots here let us catch NaNs.
+
+            if !(((analytic_dfdg - numeric_dfdg) / numeric_dfdg).abs() < TOL) {
+                panic!("numerical gamma derivative failed: p={:.16e} k={:.16e} \
+                        gamma={:.16e} cosxi={:.16e} analytic={:.16e} \
+                        numeric={:.16e}", p, k, gamma, cos_xi, analytic_dfdg, numeric_dfdg);
+            }
+
+            if !(((analytic_dfdcx - numeric_dfdcx) / numeric_dfdcx).abs() < TOL) {
+                panic!("numerical cosxi derivative failed: p={:.16e} k={:.16e} \
+                        gamma={:.16e} cosxi={:.16e} analytic={:.16e} \
+                        numeric={:.16e}", p, k, gamma, cos_xi, analytic_dfdcx, numeric_dfdcx);
+            }
+        }
     }
 }

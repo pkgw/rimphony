@@ -26,8 +26,8 @@ continous.
 extern crate gsl_sys;
 extern crate leung_bessel;
 
-#[cfg(test)]
-#[macro_use] extern crate assert_approx_eq;
+#[cfg(test)] #[macro_use] extern crate assert_approx_eq;
+#[cfg(test)] extern crate rand;
 
 use std::f64;
 
