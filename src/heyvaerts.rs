@@ -105,6 +105,9 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         // cover any NR area.
 
         let mut nr_val = self.nr_outer_integral(&mut ows, &mut iws, pomega_left, pomega_right);
+        if nr_val.is_nan() {
+            return f64::NAN;
+        }
 
         while keep_going {
             if nr_val != 0. {
@@ -124,6 +127,9 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             }
 
             let contrib = self.nr_outer_integral(&mut ows, &mut iws, pomega_right, pomega_right + delta_right);
+            if contrib.is_nan() {
+                return f64::NAN;
+            }
 
             if nr_val != 0. {
                 keep_going = (contrib / nr_val).abs() > TOL;
@@ -145,6 +151,9 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             }
 
             let contrib = self.nr_outer_integral(&mut ows, &mut iws, pomega_left - delta_left, pomega_left);
+            if contrib.is_nan() {
+                return f64::NAN;
+            }
 
             keep_going = (contrib / nr_val).abs() > TOL;
             nr_val += contrib;
