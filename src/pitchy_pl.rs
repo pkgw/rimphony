@@ -17,6 +17,7 @@ use super::{TWO_PI, DistributionFunction, FullSynchrotronCalculator};
 
 /// Parameters for a power-law electron distribution with a sin(pitch-angle)
 /// dependence. See the module-level documentation for details.
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub struct PitchyPowerLawDistribution {
     p: f64,
     k: f64,

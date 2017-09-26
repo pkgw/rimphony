@@ -19,6 +19,7 @@ use super::{TWO_PI, DistributionFunction, FullSynchrotronCalculator};
 
 /// Parameters for a power-law electron distribution. See the module-level
 /// documentation for details.
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub struct PowerLawDistribution {
     p: f64,
     gamma_min: f64,
