@@ -28,7 +28,7 @@ enum StokesVSwitch {
 }
 
 #[derive(Copy,Clone,Debug,PartialEq)]
-pub struct SymphonyCalculationState<'a, D: 'a> {
+pub struct CalculationState<'a, D: 'a> {
     d: &'a D,
     coeff: Coefficient,
     stokes: Stokes,
@@ -39,9 +39,9 @@ pub struct SymphonyCalculationState<'a, D: 'a> {
 }
 
 
-impl<'a, D: 'a + DistributionFunction> SymphonyCalculationState<'a, D> {
+impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
     pub fn new(distrib: &'a D, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> Self {
-        SymphonyCalculationState {
+        CalculationState {
             d: distrib,
             coeff: coeff,
             stokes: stokes,

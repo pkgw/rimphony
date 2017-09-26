@@ -13,6 +13,10 @@ DOI:10.3847/0004-637X/822/1/34](https://dx.doi.org/10.3847/0004-637X/822/1/34)
 and [Leung, Gammie, and Noble
 (2011)](https://dx.doi.org/10.1088/0004-637X/737/1/21).
 
+It has been expanded to compute Faraday rotation and conversion coefficients
+using the formalism developed by [Heyvaerts et al. (2013;
+DOI:10.1093/mnras/stt135)](https://dx.doi.org/10.1093/mnras/stt135).
+
 The basic structure of the problem is that we need to do an integral in a 2D
 quarter-plane defined by the variables *gamma* (>= 1) and *n* (>= 1).
 Technically, *n* can only take on discrete values, but we generally have to
@@ -32,6 +36,7 @@ extern crate leung_bessel;
 use std::f64;
 
 mod gsl;
+mod heyvaerts;
 mod symphony;
 
 pub use f64::consts::PI;
@@ -189,15 +194,16 @@ pub struct FullSynchrotronCalculator<D>(D);
 impl<D: DistributionFunction> SynchrotronCalculator for FullSynchrotronCalculator<D> {
     fn compute_dimensionless(&self, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> f64 {
         match (coeff, stokes) {
-            (Coefficient::Emission, _)|(Coefficient::Absorption, _) => {
-                symphony::SymphonyCalculationState::new(&self.0, coeff, stokes, s, theta)
-                    .compute()
-            },
             (Coefficient::Faraday, Stokes::I) => {
                 f64::NAN
             },
+            (Coefficient::Emission, _)|(Coefficient::Absorption, _) => {
+                symphony::CalculationState::new(&self.0, coeff, stokes, s, theta)
+                    .compute()
+            },
             (Coefficient::Faraday, _) => {
-                0. // TODO: implement
+                heyvaerts::CalculationState::new(&self.0, coeff, stokes, s, theta)
+                    .compute()
             },
         }
     }
