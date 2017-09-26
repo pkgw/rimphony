@@ -12,30 +12,52 @@ calls "f".
 
 */
 
+use gsl;
+use special_fun::FloatSpecial;
 use std::f64;
 
-use gsl;
-use leung_bessel;
 use super::{Coefficient, DistributionFunction, Stokes};
-use super::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI};
+use super::{ELECTRON_CHARGE, SPEED_LIGHT};
 
 const FOUR_OVER_SQRT_3: f64 = 2.3094010767585034; // 4/sqrt(3)
 const INVERSE_C: f64 = 1. / SPEED_LIGHT;
 const INVERSE_SQRT_3: f64 = 0.5773502691896257; // 1 / sqrt(3)
 const SQRT_8_OVER_3: f64 = 0.9428090415820635; // sqrt(8)/3
+const THREE_TWO_THIRDS: f64 = 2.080083823051904; // 3**(2/3)
 const TWO_OVER_SQRT_3: f64 = 1.1547005383792517; // 2/sqrt(3)
 
 
 // Bessel function helpers
 
+/// This is K_{1/3}(x) * L_{1/3}(x)
+///
+/// Here K is the modified Bessel function of the second kind and L is a
+/// similar construction. We use the approximation provided by Heyvaerts.
+///
+/// TODO: document where the approximation is valid.
+///
+/// TODO: any advantages if we do the numerics as the difference of two squares?
 fn k13l13(x: f64) -> f64 {
-    f64::NAN
+    const COEFF: f64 = f64::consts::PI * f64::consts::PI / 3.;
+    let plus = x.besseli(1./3.);
+    let minus = x.besseli(-1./3.);
+    COEFF * (minus - plus) * (minus + plus)
 }
 
+/// This is K_{2/3}(x) * L_{2/3}(x)
+///
+/// Here K is the modified Bessel function of the second kind and L is a
+/// similar construction. We use the approximation provided by Heyvaerts.
+///
+/// TODO: document where the approximation is valid.
+///
+/// TODO: any advantages if we do the numerics as the difference of two squares?
 fn k23l23(x: f64) -> f64 {
-    f64::NAN
+    const COEFF: f64 = f64::consts::PI * f64::consts::PI / 3.;
+    let plus = x.besseli(2./3.);
+    let minus = x.besseli(-2./3.);
+    COEFF * (minus - plus) * (minus + plus)
 }
-
 
 
 // The main algorithm
@@ -117,7 +139,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                 // first pass since it is often hard to compute at minimal
                 // values of sigma.
 
-                let rel_deriv = gsl::deriv_central(|pom| self.nr_outer_integrand(&mut iws, pom), pomega_right, 1e-6)
+                let rel_deriv = gsl::deriv_central(|p| self.nr_outer_integrand(&mut iws, p), pomega_right, 1e-6)
                     .map(|r| r.value)
                     .unwrap_or(f64::NAN);
 
@@ -142,7 +164,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         keep_going = true;
 
         while keep_going {
-            let rel_deriv = gsl::deriv_central(|pom| self.nr_outer_integrand(&mut iws, pom), pomega_left, 1e-6)
+            let rel_deriv = gsl::deriv_central(|p| self.nr_outer_integrand(&mut iws, p), pomega_left, 1e-6)
                 .map(|r| r.value)
                 .unwrap_or(f64::NAN);
 
@@ -160,9 +182,37 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             pomega_left -= delta_left;
         }
 
-        // Quasirez
+        // Now the quasiresonant contribution. Here sigma is the outer
+        // integration variable, pomega the inner.
 
-        let qr_val = 0.;
+        let mut qr_val = 0.;
+        let mut sigma_low = self.sigma0.max(INVERSE_SQRT_3 * self.sigma0.powf(1.5));
+        let mut delta_sigma = self.sigma0;
+        keep_going = true;
+
+        while keep_going {
+            if qr_val != 0. {
+                let rel_deriv = gsl::deriv_central(|s| self.qr_outer_integrand(&mut iws, s), sigma_low, 1e-6)
+                    .map(|r| r.value)
+                    .unwrap_or(f64::NAN);
+
+                if rel_deriv == 0. || (1. / (rel_deriv * delta_sigma)).abs() > DELTA_SCALE_FACTOR {
+                    delta_sigma *= DELTA_SCALE_FACTOR;
+                }
+            }
+
+            let contrib = self.qr_outer_integral(&mut ows, &mut iws, sigma_low, sigma_low + delta_sigma);
+            if contrib.is_nan() {
+                return f64::NAN;
+            }
+
+            if qr_val != 0. {
+                keep_going = (contrib / qr_val).abs() > TOL;
+            }
+
+            qr_val += contrib;
+            sigma_low += delta_sigma;
+        }
 
         // Final scalings:
 
@@ -182,7 +232,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
 
     #[inline]
     fn nr_outer_integral(&mut self, ows: &mut gsl::IntegrationWorkspace, iws: &mut gsl::IntegrationWorkspace, p1: f64, p2: f64) -> f64 {
-        ows.qag(|pom| self.nr_outer_integrand(iws, pom), p1, p2)
+        ows.qag(|p| self.nr_outer_integrand(iws, p), p1, p2)
             .tolerance(0., 1e-3)
             .rule(gsl::IntegrationRule::GaussKonrod31)
             .compute()
@@ -207,6 +257,37 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         };
 
         ws.qag(inner, sigma_min, sigma_max)
+            .tolerance(0., 1e-3)
+            .rule(gsl::IntegrationRule::GaussKonrod31)
+            .compute()
+            .map(|r| r.value)
+            .unwrap_or(f64::NAN)
+    }
+
+    #[inline]
+    fn qr_outer_integral(&mut self, ows: &mut gsl::IntegrationWorkspace, iws: &mut gsl::IntegrationWorkspace, s1: f64, s2: f64) -> f64 {
+        ows.qag(|s| self.qr_outer_integrand(iws, s), s1, s2)
+            .tolerance(0., 1e-3)
+            .rule(gsl::IntegrationRule::GaussKonrod31)
+            .compute()
+            .map(|r| r.value)
+            .unwrap_or(f64::NAN)
+    }
+
+    fn qr_outer_integrand(&mut self, ws: &mut gsl::IntegrationWorkspace, sigma: f64) -> f64 {
+        let pomega_max_phys = (THREE_TWO_THIRDS * sigma.powf(4./3.) - self.sigma0_sq).sqrt();
+        let pomega_max_qr = (sigma.powi(2) - self.sigma0_sq).sqrt();
+        let pomega_max = pomega_max_phys.min(pomega_max_qr);
+
+        let inner = match self.stokes {
+            Stokes::Q => |p| {
+                self.fill_coord_vars(sigma, p);
+                self.h_qr_element()
+            },
+            _ => panic!("not implemented")
+        };
+
+        ws.qag(inner, -pomega_max, pomega_max)
             .tolerance(0., 1e-3)
             .rule(gsl::IntegrationRule::GaussKonrod31)
             .compute()
