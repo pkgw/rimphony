@@ -89,47 +89,8 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             return 0.;
         }
 
-        let mut inner_workspace = gsl::IntegrationWorkspace::new(4096);
-        let mut outer_workspace = gsl::IntegrationWorkspace::new(4096);
-
-        //let (nr_elem, qr_elem) = match self.stokes {
-        //    Stokes::Q => (|p| self.h_nr_element(p), |p| self.h_qr_element(p)),
-        //    _ => panic!("not implemented"),
-        //};
-
-        // For the NR integral, pomega is the outer integrand, sigma is the
-        // inner one.
-
-        //let inner = |s| {
-        //    p.fill(self, s, p.pomega);
-        //    nr_elem(&mut p)
-        //};
-
-        //let outer = |pom| {
-        //    p.pomega = pom;
-        //
-        //    let sigma_min = (pom.powi(2) + self.sigma0_sq).sqrt();
-        //    let sigma_max = INVERSE_SQRT_3 * sigma_min.powf(1.5);
-        //
-        //    if sigma_max <= sigma_min {
-        //        return 0.;
-        //    }
-        //
-        //    let inner = match self.stokes {
-        //        Stokes::Q => |s| {
-        //            p.fill(self, s, p.pomega);
-        //            self.h_nr_element(&mut p)
-        //        },
-        //        _ => panic!("not implemented")
-        //    };
-        //
-        //    inner_workspace.qag(inner, sigma_min, sigma_max)
-        //        .tolerance(0., 1e-3)
-        //        .rule(gsl::IntegrationRule::GaussKonrod31)
-        //        .compute()
-        //        .map(|r| r.value)
-        //        .unwrap_or(f64::NAN)
-        //};
+        let mut ows = gsl::IntegrationWorkspace::new(4096); // outer workspace
+        let mut iws = gsl::IntegrationWorkspace::new(4096); // inner workspace
 
         let mut pomega_left = -3. * self.sigma0;
         let mut pomega_right = 3. * self.sigma0;
@@ -143,12 +104,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         // "low-frequency" regime such that our initial pomegas just don't
         // cover any NR area.
 
-        let mut nr_val = outer_workspace.qag(|pom| self.nr_outer_integral(&mut inner_workspace, pom), pomega_left, pomega_right)
-            .tolerance(0., 1e-3)
-            .rule(gsl::IntegrationRule::GaussKonrod31)
-            .compute()
-            .map(|r| r.value)
-            .unwrap_or(f64::NAN);
+        let mut nr_val = self.nr_outer_integral(&mut ows, &mut iws, pomega_left, pomega_right);
 
         while keep_going {
             if nr_val != 0. {
@@ -158,7 +114,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                 // first pass since it is often hard to compute at minimal
                 // values of sigma.
 
-                let rel_deriv = gsl::deriv_central(|pom| self.nr_outer_integral(&mut inner_workspace, pom), pomega_right, 1e-6)
+                let rel_deriv = gsl::deriv_central(|pom| self.nr_outer_integrand(&mut iws, pom), pomega_right, 1e-6)
                     .map(|r| r.value)
                     .unwrap_or(f64::NAN);
 
@@ -167,12 +123,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                 }
             }
 
-            let contrib = outer_workspace.qag(|pom| self.nr_outer_integral(&mut inner_workspace, pom), pomega_right, pomega_right + delta_right)
-                .tolerance(0., 1e-3)
-                .rule(gsl::IntegrationRule::GaussKonrod31)
-                .compute()
-                .map(|r| r.value)
-                .unwrap_or(f64::NAN);
+            let contrib = self.nr_outer_integral(&mut ows, &mut iws, pomega_right, pomega_right + delta_right);
 
             if nr_val != 0. {
                 keep_going = (contrib / nr_val).abs() > TOL;
@@ -185,7 +136,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         keep_going = true;
 
         while keep_going {
-            let rel_deriv = gsl::deriv_central(|pom| self.nr_outer_integral(&mut inner_workspace, pom), pomega_left, 1e-6)
+            let rel_deriv = gsl::deriv_central(|pom| self.nr_outer_integrand(&mut iws, pom), pomega_left, 1e-6)
                 .map(|r| r.value)
                 .unwrap_or(f64::NAN);
 
@@ -193,12 +144,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                 delta_left *= DELTA_SCALE_FACTOR;
             }
 
-            let contrib = outer_workspace.qag(|pom| self.nr_outer_integral(&mut inner_workspace, pom), pomega_left - delta_left, pomega_left)
-                .tolerance(0., 1e-3)
-                .rule(gsl::IntegrationRule::GaussKonrod31)
-                .compute()
-                .map(|r| r.value)
-                .unwrap_or(f64::NAN);
+            let contrib = self.nr_outer_integral(&mut ows, &mut iws, pomega_left - delta_left, pomega_left);
 
             keep_going = (contrib / nr_val).abs() > TOL;
             nr_val += contrib;
@@ -215,6 +161,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             (self.s * self.sin_observer_angle).powi(2)
     }
 
+    #[inline]
     fn fill_coord_vars(&mut self, sigma: f64, pomega: f64) {
         self.sigma = sigma;
         self.pomega = pomega;
@@ -224,7 +171,17 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             / (self.sigma0 * self.sin_observer_angle * (self.gamma.powi(2) - 1.).sqrt());
     }
 
-    fn nr_outer_integral(&mut self, ws: &mut gsl::IntegrationWorkspace, pomega: f64) -> f64 {
+    #[inline]
+    fn nr_outer_integral(&mut self, ows: &mut gsl::IntegrationWorkspace, iws: &mut gsl::IntegrationWorkspace, p1: f64, p2: f64) -> f64 {
+        ows.qag(|pom| self.nr_outer_integrand(iws, pom), p1, p2)
+            .tolerance(0., 1e-3)
+            .rule(gsl::IntegrationRule::GaussKonrod31)
+            .compute()
+            .map(|r| r.value)
+            .unwrap_or(f64::NAN)
+    }
+
+    fn nr_outer_integrand(&mut self, ws: &mut gsl::IntegrationWorkspace, pomega: f64) -> f64 {
         let sigma_min = (pomega.powi(2) + self.sigma0_sq).sqrt();
         let sigma_max = INVERSE_SQRT_3 * sigma_min.powf(1.5);
 
