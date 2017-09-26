@@ -26,6 +26,8 @@ const SQRT_8_OVER_3: f64 = 0.9428090415820635; // sqrt(8)/3
 const TWO_OVER_SQRT_3: f64 = 1.1547005383792517; // 2/sqrt(3)
 
 
+// Bessel function helpers
+
 fn k13l13(x: f64) -> f64 {
     f64::NAN
 }
@@ -35,39 +37,8 @@ fn k23l23(x: f64) -> f64 {
 }
 
 
-struct ParamSpaceLocation {
-    pub sigma: f64,
-    pub pomega: f64,
-    pub x: f64,
-    pub gamma: f64,
 
-    /// mu = cosine pitch angle
-    pub mu: f64,
-}
-
-impl ParamSpaceLocation {
-    pub fn new() -> Self {
-        ParamSpaceLocation {
-            sigma: f64::NAN,
-            pomega: f64::NAN,
-            x: f64::NAN,
-            gamma: f64::NAN,
-            mu: f64::NAN,
-        }
-    }
-
-    pub fn fill<'a, D: 'a + DistributionFunction>(&mut self, cs: &CalculationState<'a, D>, sigma: f64, pomega: f64) {
-        self.sigma = sigma;
-        self.pomega = pomega;
-        self.x = (sigma.powi(2) - pomega.powi(2) - cs.sigma0_sq).sqrt();
-        self.gamma = (sigma - pomega * cs.cos_observer_angle) / (cs.sigma0 * cs.sin_observer_angle);
-        self.mu = (sigma * cs.cos_observer_angle - pomega)
-            / (cs.sigma0 * cs.sin_observer_angle * (self.gamma.powi(2) - 1.).sqrt());
-    }
-}
-
-
-
+// The main algorithm
 
 #[derive(Copy,Clone,Debug,PartialEq)]
 struct CalculationState<'a, D: 'a> {
@@ -79,6 +50,15 @@ struct CalculationState<'a, D: 'a> {
     sin_observer_angle: f64,
     sigma0: f64,
     sigma0_sq: f64,
+
+    // Variables set inside integrands:
+
+    sigma: f64,
+    pomega: f64,
+    x: f64,
+    gamma: f64,
+    /// mu = cosine pitch angle
+    mu: f64,
 }
 
 
@@ -94,6 +74,11 @@ pub fn compute_dimensionless<D: DistributionFunction>(distrib: &D, coeff: Coeffi
         sin_observer_angle: theta.sin(),
         sigma0: sigma0,
         sigma0_sq: sigma0.powi(2),
+        sigma: f64::NAN,
+        pomega: f64::NAN,
+        x: f64::NAN,
+        gamma: f64::NAN,
+        mu: f64::NAN,
     }.compute()
 }
 
@@ -104,7 +89,6 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             return 0.;
         }
 
-        let mut p = ParamSpaceLocation::new();
         let mut inner_workspace = gsl::IntegrationWorkspace::new(4096);
         let mut outer_workspace = gsl::IntegrationWorkspace::new(4096);
 
@@ -159,7 +143,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         // "low-frequency" regime such that our initial pomegas just don't
         // cover any NR area.
 
-        let mut nr_val = outer_workspace.qag(|pom| self.nr_outer_integral(&mut inner_workspace, &mut p, pom), pomega_left, pomega_right)
+        let mut nr_val = outer_workspace.qag(|pom| self.nr_outer_integral(&mut inner_workspace, pom), pomega_left, pomega_right)
             .tolerance(0., 1e-3)
             .rule(gsl::IntegrationRule::GaussKonrod31)
             .compute()
@@ -174,7 +158,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                 // first pass since it is often hard to compute at minimal
                 // values of sigma.
 
-                let rel_deriv = gsl::deriv_central(|pom| self.nr_outer_integral(&mut inner_workspace, &mut p, pom), pomega_right, 1e-6)
+                let rel_deriv = gsl::deriv_central(|pom| self.nr_outer_integral(&mut inner_workspace, pom), pomega_right, 1e-6)
                     .map(|r| r.value)
                     .unwrap_or(f64::NAN);
 
@@ -183,7 +167,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                 }
             }
 
-            let contrib = outer_workspace.qag(|pom| self.nr_outer_integral(&mut inner_workspace, &mut p, pom), pomega_right, pomega_right + delta_right)
+            let contrib = outer_workspace.qag(|pom| self.nr_outer_integral(&mut inner_workspace, pom), pomega_right, pomega_right + delta_right)
                 .tolerance(0., 1e-3)
                 .rule(gsl::IntegrationRule::GaussKonrod31)
                 .compute()
@@ -201,7 +185,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         keep_going = true;
 
         while keep_going {
-            let rel_deriv = gsl::deriv_central(|pom| self.nr_outer_integral(&mut inner_workspace, &mut p, pom), pomega_left, 1e-6)
+            let rel_deriv = gsl::deriv_central(|pom| self.nr_outer_integral(&mut inner_workspace, pom), pomega_left, 1e-6)
                 .map(|r| r.value)
                 .unwrap_or(f64::NAN);
 
@@ -209,7 +193,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                 delta_left *= DELTA_SCALE_FACTOR;
             }
 
-            let contrib = outer_workspace.qag(|pom| self.nr_outer_integral(&mut inner_workspace, &mut p, pom), pomega_left - delta_left, pomega_left)
+            let contrib = outer_workspace.qag(|pom| self.nr_outer_integral(&mut inner_workspace, pom), pomega_left - delta_left, pomega_left)
                 .tolerance(0., 1e-3)
                 .rule(gsl::IntegrationRule::GaussKonrod31)
                 .compute()
@@ -231,8 +215,16 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             (self.s * self.sin_observer_angle).powi(2)
     }
 
-    fn nr_outer_integral(&self, ws: &mut gsl::IntegrationWorkspace,
-                         mut p: &mut ParamSpaceLocation, pomega: f64) -> f64 {
+    fn fill_coord_vars(&mut self, sigma: f64, pomega: f64) {
+        self.sigma = sigma;
+        self.pomega = pomega;
+        self.x = (sigma.powi(2) - pomega.powi(2) - self.sigma0_sq).sqrt();
+        self.gamma = (sigma - pomega * self.cos_observer_angle) / (self.sigma0 * self.sin_observer_angle);
+        self.mu = (sigma * self.cos_observer_angle - pomega)
+            / (self.sigma0 * self.sin_observer_angle * (self.gamma.powi(2) - 1.).sqrt());
+    }
+
+    fn nr_outer_integral(&mut self, ws: &mut gsl::IntegrationWorkspace, pomega: f64) -> f64 {
         let sigma_min = (pomega.powi(2) + self.sigma0_sq).sqrt();
         let sigma_max = INVERSE_SQRT_3 * sigma_min.powf(1.5);
 
@@ -242,8 +234,8 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
 
         let inner = match self.stokes {
             Stokes::Q => |s| {
-                p.fill(self, s, pomega);
-                self.h_nr_element(&mut p)
+                self.fill_coord_vars(s, pomega);
+                self.h_nr_element()
             },
             _ => panic!("not implemented")
         };
@@ -260,16 +252,16 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
     ///
     /// Heyvaerts equation 120 with the standard prefactorization that we have
     /// chosen.
-    fn h_qr_element(&self, p: &ParamSpaceLocation) -> f64 {
-        let po_sq = p.pomega.powi(2);
-        let smxox = (p.sigma - p.x) / p.x;
-        let g = SQRT_8_OVER_3 * (p.sigma - p.x).powf(1.5) / p.x.sqrt();
+    fn h_qr_element(&self) -> f64 {
+        let po_sq = self.pomega.powi(2);
+        let smxox = (self.sigma - self.x) / self.x;
+        let g = SQRT_8_OVER_3 * (self.sigma - self.x).powf(1.5) / self.x.sqrt();
 
-        let t1 = FOUR_OVER_SQRT_3 * p.x.powi(2) * smxox.powi(2) * k23l23(g);
+        let t1 = FOUR_OVER_SQRT_3 * self.x.powi(2) * smxox.powi(2) * k23l23(g);
         let t2 = TWO_OVER_SQRT_3 * po_sq * smxox * k13l13(g);
         let t3 = -f64::consts::PI * (2. * po_sq + self.sigma0_sq) / (po_sq + self.sigma0_sq).sqrt();
 
-        let dfds = self.dfdsigma(p);
+        let dfds = self.dfdsigma();
 
         return INVERSE_C * (t1 + t2 + t3) * dfds;
     }
@@ -278,9 +270,9 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
     ///
     /// Heyvaerts equation 119 with the standard prefactorization that we have
     /// chosen.
-    fn h_nr_element(&self, p: &ParamSpaceLocation) -> f64 {
-        let s_sq = p.sigma.powi(2);
-        let x_sq = p.x.powi(2);
+    fn h_nr_element(&self) -> f64 {
+        let s_sq = self.sigma.powi(2);
+        let x_sq = self.x.powi(2);
         let ssqmxsq = s_sq - x_sq;
         let a1 = 1. / 8. - 5. / 24. * s_sq / ssqmxsq;
         let a2 = 3. / 128. - 77. / 576. * s_sq / ssqmxsq + 385. / 3456. * (s_sq / ssqmxsq).powi(2);
@@ -290,15 +282,15 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         let t2 = (6. * a2 - a1.powi(2)) / ssqmxsq.powf(1.5);
         let u1 = 2. * t1 - self.sigma0_sq * t2;
 
-        let dfds = self.dfdsigma(p);
+        let dfds = self.dfdsigma();
 
         return f64::consts::PI * INVERSE_C * u1 * dfds;
     }
 
     /// The derivative of the distribution function with regards to the
     /// Heyvaerts coordinate sigma.
-    fn dfdsigma(&self, p: &ParamSpaceLocation) -> f64 {
-        let (dfdg, dfdcxi) = self.d.calc_f_derivatives(p.gamma, p.mu);
+    fn dfdsigma(&self) -> f64 {
+        let (dfdg, dfdcxi) = self.d.calc_f_derivatives(self.gamma, self.mu);
 
         let g_term = dfdg / self.sigma0_sq;
 
@@ -308,8 +300,8 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             // I'm sure this could be simplified but this works so let's just
             // run with it for now. I just banged this out in sympy and checked
             // numerically.
-            let q = p.sigma - p.pomega * self.cos_observer_angle;
-            let r = p.pomega - p.sigma * self.cos_observer_angle;
+            let q = self.sigma - self.pomega * self.cos_observer_angle;
+            let r = self.pomega - self.sigma * self.cos_observer_angle;
             let t = self.sigma0 * self.sin_observer_angle;
             let u = q.powi(2) - t.powi(2);
             let dcxi_dsigma = (q * u * self.cos_observer_angle + u * r + r * t.powi(2))
