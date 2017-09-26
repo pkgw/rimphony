@@ -68,8 +68,9 @@ impl ParamSpaceLocation {
 
 
 
+
 #[derive(Copy,Clone,Debug,PartialEq)]
-pub struct CalculationState<'a, D: 'a> {
+struct CalculationState<'a, D: 'a> {
     d: &'a D,
     coeff: Coefficient,
     stokes: Stokes,
@@ -81,22 +82,22 @@ pub struct CalculationState<'a, D: 'a> {
 }
 
 
+pub fn compute_dimensionless<D: DistributionFunction>(distrib: &D, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> f64 {
+    let sigma0 = s * theta.sin();
+
+    CalculationState {
+        d: distrib,
+        coeff: coeff,
+        stokes: stokes,
+        s: s,
+        cos_observer_angle: theta.cos(),
+        sin_observer_angle: theta.sin(),
+        sigma0: sigma0,
+        sigma0_sq: sigma0.powi(2),
+    }.compute()
+}
+
 impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
-    pub fn new(distrib: &'a D, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> Self {
-        let sigma0 = s * theta.sin();
-
-        CalculationState {
-            d: distrib,
-            coeff: coeff,
-            stokes: stokes,
-            s: s,
-            cos_observer_angle: theta.cos(),
-            sin_observer_angle: theta.sin(),
-            sigma0: sigma0,
-            sigma0_sq: sigma0.powi(2),
-        }
-    }
-
     pub fn compute(&mut self) -> f64 {
         // XXX TEMP
         if self.stokes == Stokes::V {

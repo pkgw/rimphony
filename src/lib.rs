@@ -194,17 +194,12 @@ pub struct FullSynchrotronCalculator<D>(D);
 impl<D: DistributionFunction> SynchrotronCalculator for FullSynchrotronCalculator<D> {
     fn compute_dimensionless(&self, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> f64 {
         match (coeff, stokes) {
-            (Coefficient::Faraday, Stokes::I) => {
-                f64::NAN
-            },
-            (Coefficient::Emission, _)|(Coefficient::Absorption, _) => {
-                symphony::CalculationState::new(&self.0, coeff, stokes, s, theta)
-                    .compute()
-            },
-            (Coefficient::Faraday, _) => {
-                heyvaerts::CalculationState::new(&self.0, coeff, stokes, s, theta)
-                    .compute()
-            },
+            (Coefficient::Faraday, Stokes::I) =>
+                f64::NAN,
+            (Coefficient::Emission, _)|(Coefficient::Absorption, _) =>
+                symphony::compute_dimensionless(&self.0, coeff, stokes, s, theta),
+            (Coefficient::Faraday, _) =>
+                heyvaerts::compute_dimensionless(&self.0, coeff, stokes, s, theta),
         }
     }
 }

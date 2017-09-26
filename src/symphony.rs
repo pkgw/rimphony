@@ -28,7 +28,7 @@ enum StokesVSwitch {
 }
 
 #[derive(Copy,Clone,Debug,PartialEq)]
-pub struct CalculationState<'a, D: 'a> {
+struct CalculationState<'a, D: 'a> {
     d: &'a D,
     coeff: Coefficient,
     stokes: Stokes,
@@ -39,19 +39,20 @@ pub struct CalculationState<'a, D: 'a> {
 }
 
 
-impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
-    pub fn new(distrib: &'a D, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> Self {
-        CalculationState {
-            d: distrib,
-            coeff: coeff,
-            stokes: stokes,
-            s: s,
-            cos_observer_angle: theta.cos(),
-            sin_observer_angle: theta.sin(),
-            stokes_v_switch: StokesVSwitch::Inactive,
-        }
-    }
+pub fn compute_dimensionless<D: DistributionFunction>(distrib: &D, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> f64 {
+    CalculationState {
+        d: distrib,
+        coeff: coeff,
+        stokes: stokes,
+        s: s,
+        cos_observer_angle: theta.cos(),
+        sin_observer_angle: theta.sin(),
+        stokes_v_switch: StokesVSwitch::Inactive,
+    }.compute()
+}
 
+
+impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
     pub fn compute(&mut self) -> f64 {
         const N_MAX: f64 = 30.;
 
