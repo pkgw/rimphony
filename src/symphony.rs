@@ -127,6 +127,7 @@ impl<'a, D: 'a + DistributionFunction> SymphonyCalculationState<'a, D> {
                 -1. * (TWO_PI * ELECTRON_CHARGE).powi(2) /
                     (2. * MASS_ELECTRON * SPEED_LIGHT * self.cos_observer_angle.abs())
             },
+            Coefficient::Faraday => panic!("should never be reached"),
         }
     }
 
@@ -289,6 +290,7 @@ impl<'a, D: 'a + DistributionFunction> SymphonyCalculationState<'a, D> {
                 let dfdcx_factor = (beta * self.cos_observer_angle - cos_xi) / (gamma - 1. / gamma);
                 dfdg + dfdcx_factor * dfdcx
             },
+            Coefficient::Faraday => panic!("should never be reached"),
         }
     }
 }

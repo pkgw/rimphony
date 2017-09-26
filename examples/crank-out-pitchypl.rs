@@ -137,8 +137,10 @@ fn main() {
 
         writeln!(file,
                  "{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t\
-                  {:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t",
+                  {:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t\
+                  {:.16e}",
                  s, theta, p, k, ms,
-                 vals[0], vals[1], vals[2], vals[3], vals[4], vals[5]).expect("write error");
+                 vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], vals[7]
+        ).expect("write error");
     }
 }

@@ -36,6 +36,7 @@ fn main() {
             SPEED_LIGHT * THETA.cos().abs() / ((TWO_PI * ELECTRON_CHARGE).powi(2) * NU),
         Coefficient::Absorption =>
             -2. * MASS_ELECTRON * SPEED_LIGHT * NU * THETA.cos().abs() / (TWO_PI * ELECTRON_CHARGE).powi(2),
+        Coefficient::Faraday => panic!("not supported"),
     };
 
     println!("Inner Symphony: {:e}   Us: {:e}", SYMPHONY_VAL * remove_units, val * remove_units);

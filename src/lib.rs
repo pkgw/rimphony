@@ -78,6 +78,14 @@ pub enum Coefficient {
 
     /// The absorption coefficient, in units of inverse centimeters.
     Absorption,
+
+    /// A Faraday conversion or rotation coefficient, in units of inverse
+    /// centimeters. The "Stokes Q" coefficient is the Faraday conversion
+    /// coefficient, sometimes denoted `rho_{UV}`, and the "Stokes V"
+    /// coefficient is the Faraday rotation coefficient, sometimes denoted
+    /// `rho_{QU}`. It is not meaningful to refer to the "Stokes I" Faraday
+    /// coefficient.
+    Faraday,
 }
 
 
@@ -121,13 +129,15 @@ pub trait SynchrotronCalculator {
         match coeff {
             Coefficient::Emission => val * n_e * nu,
             Coefficient::Absorption => val * n_e / nu,
+            Coefficient::Faraday => val * n_e / nu,
         }
     }
 
-    /// Compute all six coefficients in their dimensionless form. The return
-    /// value is an array of `[j_i, alpha_i, j_q, alpha_q, j_v, alpha_v]`.
-    fn compute_all_dimensionless(&self, s: f64, theta: f64) -> [f64; 6] {
-        let mut rv = [0_f64; 6];
+    /// Compute all eight coefficients in their dimensionless form. The return
+    /// value is an array of `[j_i, alpha_i, j_q, alpha_q, j_v, alpha_v,
+    /// faraday_q, faraday_v]`.
+    fn compute_all_dimensionless(&self, s: f64, theta: f64) -> [f64; 8] {
+        let mut rv = [0_f64; 8];
 
         rv[0] = self.compute_dimensionless(Coefficient::Emission, Stokes::I, s, theta);
         rv[1] = self.compute_dimensionless(Coefficient::Absorption, Stokes::I, s, theta);
@@ -135,21 +145,26 @@ pub trait SynchrotronCalculator {
         rv[3] = self.compute_dimensionless(Coefficient::Absorption, Stokes::Q, s, theta);
         rv[4] = self.compute_dimensionless(Coefficient::Emission, Stokes::V, s, theta);
         rv[5] = self.compute_dimensionless(Coefficient::Absorption, Stokes::V, s, theta);
+        rv[6] = self.compute_dimensionless(Coefficient::Faraday, Stokes::Q, s, theta);
+        rv[7] = self.compute_dimensionless(Coefficient::Faraday, Stokes::V, s, theta);
 
         rv
     }
 
     /// Compute all six coefficients in their cgs form. The return
-    /// value is an array of `[j_i, alpha_i, j_q, alpha_q, j_v, alpha_v]`.
-    fn compute_all_cgs(&self, nu: f64, b: f64, n_e: f64, theta: f64) -> [f64; 6] {
-        let mut rv = [0_f64; 6];
+    /// value is an array of `[j_i, alpha_i, j_q, alpha_q, j_v, alpha_v,
+    /// faraday_q, faraday_v]`.
+    fn compute_all_cgs(&self, nu: f64, b: f64, n_e: f64, theta: f64) -> [f64; 8] {
+        let mut rv = [0_f64; 8];
 
-        rv[0] = self.compute_cgs(Coefficient::Emission, Stokes::I, nu, b, n_e,  theta);
-        rv[1] = self.compute_cgs(Coefficient::Absorption, Stokes::I, nu, b, n_e,  theta);
-        rv[2] = self.compute_cgs(Coefficient::Emission, Stokes::Q, nu, b, n_e,  theta);
-        rv[3] = self.compute_cgs(Coefficient::Absorption, Stokes::Q, nu, b, n_e,  theta);
-        rv[4] = self.compute_cgs(Coefficient::Emission, Stokes::V, nu, b, n_e,  theta);
-        rv[5] = self.compute_cgs(Coefficient::Absorption, Stokes::V, nu, b, n_e,  theta);
+        rv[0] = self.compute_cgs(Coefficient::Emission, Stokes::I, nu, b, n_e, theta);
+        rv[1] = self.compute_cgs(Coefficient::Absorption, Stokes::I, nu, b, n_e, theta);
+        rv[2] = self.compute_cgs(Coefficient::Emission, Stokes::Q, nu, b, n_e, theta);
+        rv[3] = self.compute_cgs(Coefficient::Absorption, Stokes::Q, nu, b, n_e, theta);
+        rv[4] = self.compute_cgs(Coefficient::Emission, Stokes::V, nu, b, n_e, theta);
+        rv[5] = self.compute_cgs(Coefficient::Absorption, Stokes::V, nu, b, n_e, theta);
+        rv[6] = self.compute_cgs(Coefficient::Faraday, Stokes::Q, nu, b, n_e, theta);
+        rv[7] = self.compute_cgs(Coefficient::Faraday, Stokes::V, nu, b, n_e, theta);
 
         rv
     }
@@ -173,7 +188,17 @@ pub struct FullSynchrotronCalculator<D>(D);
 
 impl<D: DistributionFunction> SynchrotronCalculator for FullSynchrotronCalculator<D> {
     fn compute_dimensionless(&self, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> f64 {
-        symphony::SymphonyCalculationState::new(&self.0, coeff, stokes, s, theta)
-            .compute()
+        match (coeff, stokes) {
+            (Coefficient::Emission, _)|(Coefficient::Absorption, _) => {
+                symphony::SymphonyCalculationState::new(&self.0, coeff, stokes, s, theta)
+                    .compute()
+            },
+            (Coefficient::Faraday, Stokes::I) => {
+                f64::NAN
+            },
+            (Coefficient::Faraday, _) => {
+                0. // TODO: implement
+            },
+        }
     }
 }
