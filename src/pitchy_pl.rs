@@ -187,6 +187,16 @@ mod tests {
     }
 
     #[test]
+    fn k_zero_rq() {
+        test_k_zero(6, Coefficient::Faraday, Stokes::Q);
+    }
+
+    #[test]
+    fn k_zero_rv() {
+        test_k_zero(9, Coefficient::Faraday, Stokes::V);
+    }
+
+    #[test]
     fn test_derivatives() {
         use rand;
         const EPS: f64 = 1e-6;
