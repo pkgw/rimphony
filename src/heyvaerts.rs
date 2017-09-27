@@ -28,6 +28,7 @@ use super::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT};
 const FOUR_OVER_SQRT_3: f64 = 2.3094010767585034; // 4/sqrt(3)
 const INVERSE_C: f64 = 1. / SPEED_LIGHT;
 const INVERSE_SQRT_3: f64 = 0.5773502691896257; // 1 / sqrt(3)
+const SQRT_3: f64 = 1.7320508075688772; // sqrt(8)/3
 const SQRT_8_OVER_3: f64 = 0.9428090415820635; // sqrt(8)/3
 const THREE_TWO_THIRDS: f64 = 2.080083823051904; // 3**(2/3)
 const TWO_OVER_SQRT_3: f64 = 1.1547005383792517; // 2/sqrt(3)
@@ -412,7 +413,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
     /// chosen, and moving the "x" inside the parentheses.
     fn f_qr_element(&self) -> f64 {
         let g = SQRT_8_OVER_3 * (self.sigma - self.x).powf(1.5) / self.x.sqrt();
-        let z = g * k23l13(g) - f64::consts::PI;
+        let z = SQRT_3 * g * k23l13(g) - f64::consts::PI;
 
         let dfds = self.dfdsigma();
 
