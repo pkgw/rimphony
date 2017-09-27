@@ -23,89 +23,14 @@ use special_fun::FloatSpecial;
 use std::f64;
 
 use super::{Coefficient, DistributionFunction, Stokes};
-use super::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT};
+use super::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI};
 
-const FOUR_OVER_SQRT_3: f64 = 2.3094010767585034; // 4/sqrt(3)
+const FOUR_OVER_SQRT_27: f64 = 0.769800358919501; // 4/sqrt(27) = 4/3^1.5
 const INVERSE_C: f64 = 1. / SPEED_LIGHT;
 const INVERSE_SQRT_3: f64 = 0.5773502691896257; // 1 / sqrt(3)
-const SQRT_3: f64 = 1.7320508075688772; // sqrt(8)/3
 const SQRT_8_OVER_3: f64 = 0.9428090415820635; // sqrt(8)/3
 const THREE_TWO_THIRDS: f64 = 2.080083823051904; // 3**(2/3)
-const TWO_OVER_SQRT_3: f64 = 1.1547005383792517; // 2/sqrt(3)
-
-
-// Bessel function helpers
-
-/// This is K_{1/3}(x) * L_{1/3}(x)
-///
-/// Here K is the modified Bessel function of the second kind and L is a
-/// similar construction. We use the approximation provided by Heyvaerts.
-///
-/// TODO: document where the approximation is valid.
-///
-/// TODO: any advantages if we do the numerics as the difference of two squares?
-fn k13l13(x: f64) -> f64 {
-    const COEFF: f64 = f64::consts::PI * f64::consts::PI / 3.;
-    let plus = x.besseli(1./3.);
-    let minus = x.besseli(-1./3.);
-    COEFF * (minus - plus) * (minus + plus)
-}
-
-/// This is K_{2/3}(x) * L_{1/3}(x)
-///
-/// Here K is the modified Bessel function of the second kind and L is a
-/// similar construction. We use the approximation provided by Heyvaerts.
-///
-/// TODO: document where the approximation is valid.
-///
-/// TODO: any advantages if we do the numerics as the difference of two squares?
-///
-/// This appproximation is only supposed to kick in when x <~ 1., but I have
-/// cases where I have x ~ 15. I think what's happening is that the NR/QR
-/// structure of the problem is weird (sigma_QR_min < sigma_0) and Heyvaert's
-/// assumptions about the problem geometry aren't so valid.
-fn k23l13(x: f64) -> f64 {
-    let k_term = if x < 10. {
-        f64::consts::PI * INVERSE_SQRT_3 * (x.besseli(-2./3.) - x.besseli(2./3.))
-    } else {
-        // Blah. The Amos Fortran library has a routine called ZBESK that
-        // seems capable of computing K_{2/3}, but I don't see any routines
-        // that I can easily incorporate here. (As best I can tell the Scipy
-        // `kv()` bessel routine eventually delegates to Amos.) But Wikipedia
-        // says that you can evaluate K_{2/3} with the following "rapidly
-        // converged" integral, so let's do that. Hopefully this codepath
-        // won't be triggered often anyway.
-
-        let mut ws = gsl::IntegrationWorkspace::new(128);
-        INVERSE_SQRT_3 * ws.qagiu(|q| {
-            let r = q.powi(2) / 3.;
-            (3. + 6. * r) * (-x * (1. + 4. * r) * (1. + r).sqrt()).exp() / (1. + r).sqrt()
-        }, 0.)
-            .tolerance(0., 1e-5)
-            .compute()
-            .map(|r| r.value)
-            .unwrap_or(f64::NAN)
-    };
-
-    let l_term = f64::consts::PI * INVERSE_SQRT_3 * (x.besseli(-1./3.) + x.besseli(1./3.));
-
-    k_term * l_term
-}
-
-/// This is K_{2/3}(x) * L_{2/3}(x)
-///
-/// Here K is the modified Bessel function of the second kind and L is a
-/// similar construction. We use the approximation provided by Heyvaerts.
-///
-/// TODO: document where the approximation is valid.
-///
-/// TODO: any advantages if we do the numerics as the difference of two squares?
-fn k23l23(x: f64) -> f64 {
-    const COEFF: f64 = f64::consts::PI * f64::consts::PI / 3.;
-    let plus = x.besseli(2./3.);
-    let minus = x.besseli(-2./3.);
-    COEFF * (minus - plus) * (minus + plus)
-}
+const G_APPROXIMATION_CUTOFF: f64 = 10.;
 
 
 // The main algorithm
@@ -377,8 +302,67 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         let smxox = (self.sigma - self.x) / self.x;
         let g = SQRT_8_OVER_3 * (self.sigma - self.x).powf(1.5) / self.x.sqrt();
 
-        let t1 = FOUR_OVER_SQRT_3 * self.x.powi(2) * smxox.powi(2) * k23l23(g);
-        let t2 = TWO_OVER_SQRT_3 * po_sq * smxox * k13l13(g);
+        // Heyvaert's approximation that g is always O(1) is not borne out in
+        // practice. Building from Eq 120,
+        //
+        // t1 = 4/sqrt(3) x^2 ((sigma - x) / x)^2 K_2/3(g) L_2/3(g)
+        //
+        // Expanding the definitions of K and L,
+        //
+        // t1 = 4/3^(3/2) pi^2 x^2 ((sigma - x) / x)^2 (I_{-2/3}(g) - I_{2/3}(g) (I_{-2/3}(g) + I_{2/3}(g)  [A]
+        //
+        // But this approximation fails badly when the assumption of small "g"
+        // is wrong. Reversing the approximations given in Eqs 95/96,
+        //
+        // t1 = pi^2 x^2 J'_sigma(x) Y'_sigma(x)
+        //
+        // Therefore writing t1 = pi^2 x^2 y, we can approximate t1. We don't
+        // have access to a canned function that gives us Y'_sigma(x), but
+        // there's an easy recurrence relation:
+        //
+        // Y'_s(x) = Y_{s-1}(x) - s/x Y_s(x)
+        //
+        // We do not use the Leung Bessel derivative for J since it
+        // (currently) fails for sigma < 1.
+
+        let y = if g < G_APPROXIMATION_CUTOFF {
+            let plus = g.besseli(2./3.);
+            let minus = g.besseli(-2./3.);
+            FOUR_OVER_SQRT_27 * smxox.powi(2) * (minus - plus) * (minus + plus)
+        } else {
+            let jvp = self.x.besselj(self.sigma - 1.) - self.sigma * self.x.besselj(self.sigma) / self.x;
+            let yvp = self.x.bessely(self.sigma - 1.) - self.sigma * self.x.bessely(self.sigma) / self.x;
+            jvp * yvp
+        };
+
+        let t1 = f64::consts::PI * f64::consts::PI * self.x.powi(2) * y;
+
+        // The same reasoning as above for term 2:
+        //
+        // t2 = 2 pomega^2/sqrt(3) (sigma - x)/x K_{1/3}(g) L_{1/3}(g)
+        //
+        // Leads to:
+        //
+        // t2 = pi^2 pomega^2 y
+        //
+        // with either
+        //
+        // y = 2/3^1.5 (sigma - x)/x (I_{-1/3}(g) - I_{1/3}(g)) (I_{-1/3}(g) + I_{1/3}(g))
+        //
+        // or
+        //
+        // y = -J_sigma(x) Y_sigma(x)
+
+        let y = if g < G_APPROXIMATION_CUTOFF {
+            let plus = g.besseli(1./3.);
+            let minus = g.besseli(-1./3.);
+            0.5 * FOUR_OVER_SQRT_27 * smxox * (minus - plus) * (minus + plus)
+        } else {
+            -self.x.besselj(self.sigma) * self.x.bessely(self.sigma)
+        };
+
+        let t2 = f64::consts::PI * f64::consts::PI * self.pomega.powi(2) * y;
+
         let t3 = -f64::consts::PI * (2. * po_sq + self.sigma0_sq) / (po_sq + self.sigma0_sq).sqrt();
 
         let dfds = self.dfdsigma();
@@ -413,11 +397,51 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
     /// chosen, and moving the "x" inside the parentheses.
     fn f_qr_element(&self) -> f64 {
         let g = SQRT_8_OVER_3 * (self.sigma - self.x).powf(1.5) / self.x.sqrt();
-        let z = SQRT_3 * g * k23l13(g) - f64::consts::PI;
+
+        // Let "z" denote the main funky term of Equation 99, with the "x" brought
+        // inside the parentheses:
+        //
+        // z = x sqrt(8/3) ((sigma - x) / x)^(3/2) K_{2/3}(g) L_{1/3}(g)
+        //
+        // From the definition of "g" and Heyvaert's Equation 93,
+        //
+        // z = pi^2/sqrt(3) g (I_{-2/3}(g) - I_{2/3}(g)) (I_{-1/3}(g) + I_{1/3}(g))  [A]
+        //
+        // From the approximations given in Equations 95 and 96, we see that also
+        //
+        // z = -pi^2 x J'_sigma(x) Y_sigma(x)  [B]
+        //
+        // Heyvaerts assumes that g is O(1), but for certain conditions one can get
+        // larger values in practice, in which case approximation A fares very badly.
+        // Therefore we write:
+        //
+        // f = -2/c pomega (pi^2 y - pi) df/dsigma
+        //   = -2pi/c pomega (pi y - 1) df/dsigma
+        //
+        // And if g is <~ 10,
+        //
+        // y = g (I_{-2/3}(g) - I_{2/3}(g)) (I_{-1/3}(g) + I_{1/3}(g)) / sqrt(3)  [A]
+        //
+        // otherwise
+        //
+        // y = -x J'_sigma(x) Y_sigma(x) .  [B]
+        //
+        // For reference, Wikipedia mentions a "rapidly converging" integral
+        // expression for K_{2/3} that could potentially come in handy.
+
+        let y = if g < G_APPROXIMATION_CUTOFF {
+            INVERSE_SQRT_3
+                * g
+                * (g.besseli(-2./3.) - g.besseli(2./3.))
+                * (g.besseli(-1./3.) + g.besseli(1./3.))
+        } else {
+            let jvp = self.x.besselj(self.sigma - 1.) - self.sigma * self.x.besselj(self.sigma) / self.x;
+            -self.x * jvp * self.x.bessely(self.sigma)
+        };
 
         let dfds = self.dfdsigma();
 
-        -2. * INVERSE_C * z * self.pomega * dfds
+        -TWO_PI * INVERSE_C * self.pomega * (f64::consts::PI * y - 1.) * dfds
     }
 
     /// The nonresonant (NR) approximation of the "f" (Faraday V) coefficient.
