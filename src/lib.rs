@@ -9,19 +9,28 @@ written in C that is primarily the work of Alex Pandya and the group of
 Charles Gammie at the University of Illinois. This port attempts to clean
 up the code to make it a bit easier to experiment with. The key
 publications are [Pandya, Zhang, Chandra, and Gammie (2016;
-DOI:10.3847/0004-637X/822/1/34](https://dx.doi.org/10.3847/0004-637X/822/1/34)
+DOI:10.3847/0004-637X/822/1/34)](https://dx.doi.org/10.3847/0004-637X/822/1/34)
 and [Leung, Gammie, and Noble
-(2011)](https://dx.doi.org/10.1088/0004-637X/737/1/21).
+(2011; DOI:10.1088/0004-637X/737/1/21)](https://dx.doi.org/10.1088/0004-637X/737/1/21).
 
 It has been expanded to compute Faraday rotation and conversion coefficients
 using the formalism developed by [Heyvaerts et al. (2013;
 DOI:10.1093/mnras/stt135)](https://dx.doi.org/10.1093/mnras/stt135).
 
-The basic structure of the problem is that we need to do an integral in a 2D
-quarter-plane defined by the variables *gamma* (>= 1) and *n* (>= 1).
-Technically, *n* can only take on discrete values, but we generally have to
-integrate over very large values of *n* such that we can treat it as being
-continous.
+The basic structure of the problem is that we need to do a 2D integral. In
+Symphony, this integral is over a quarter-plane defined by the variables γ (>=
+1) and *n* (>= 1). Technically, *n* can only take on discrete values, but we
+generally have to integrate over very large values of *n* such that we can
+treat it as being continous. In the Heyvaerts formalism, the integral is over
+a parabolic surface in two variables called σ and ϖ.
+
+To calculate coefficients, create an instance of the one of the “distribution”
+structs defined below, then use one of the methods on the struct to obtain a
+helper object implementing the
+[SynchrotronCalculator](trait.SynchrotronCalculator.html) trait. In some
+cases, you can obtain different kinds of calculators: ones that do the fully
+detailed calculations, or ones that use various approximations that can help
+with checking results.
 
 */
 
@@ -99,16 +108,38 @@ pub enum Coefficient {
 /// using different distributions.
 pub trait DistributionFunction {
     /// This function gives the modified distribution function `d(n_e) /
-    /// (gamma^2 beta d(gamma) d(cos xi) d(phi)])`. In all the cases in
-    /// Symphony, isotropy and gyrotropy are assumed, so the `d(cos xi)
-    /// d(phi)` become 1/4pi. The funny scalings are due to me being stuck on
-    /// the numerical derivative step. To be revisited.
+    /// [d(gamma) d(cos xi) d(phi)]`. In all the cases in Symphony, isotropy
+    /// and gyrotropy are assumed, so the `d(cos xi) d(phi)` becomes 1/4π.
+    /// This function should be normalized such that its integral over all of
+    /// momentum space is 1/(mc)³. In the gamma/cos xi/phi parameterization,
+    /// that integral is:
+    ///
+    /// ```text
+    /// (mc)^{-3} \int_0^{2\pi} d\phi \int_{-1}^{1} d\cos\xi \int_1^\infty d\gamma \gamma^2 \beta f
+    /// ```
+    ///
+    /// So in the isotropic case the requirement is that
+    ///
+    /// ```text
+    /// \int_1^\infty d\gamma \gamma^2 \beta f = 1 / 4 \pi
+    /// ```
+    ///
+    /// (The factor of (mc)³ is simplifying the fact that the distribution
+    /// function should really have units of inverse momentum cubed, since the
+    /// best definition of the distribution function is as the probability
+    /// density function that a given particle has a particular location in
+    /// momentum space:
+    ///
+    /// ```text
+    /// \int d^3p f = 1
+    /// ```
+    ///
+    /// In practice virtually everyone expresses their distribution functions
+    /// in terms of γ, so the (mc)³ factor is pretty much universal.)
     fn calc_f(&self, gamma: f64, cos_xi: f64) -> f64;
 
-    /// The derivative of `calc_f` with regards to `gamma` and `cos_xi`. This
-    /// must include the derivative with regards to the `1 / (gamma^2 beta)`
-    /// factor that turns the gamma/cos xi/phi coordinates into p^3
-    /// coordinates.
+    /// The partial derivatives of `calc_f` with regards to `gamma` and
+    /// `cos_xi`.
     fn calc_f_derivatives(&self, gamma: f64, cos_xi: f64) -> (f64, f64);
 }
 

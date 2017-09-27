@@ -10,6 +10,12 @@ DOI:10.1093/mnras/stt135)](https://dx.doi.org/10.1093/mnras/stt135).
 Our Faraday Q is what Heyvaerts calls "h", and our Faraday V is what Heyvaerts
 calls "f".
 
+Heyvaerts derives simplified calculations for isotropic distribution functions
+that should be faster, and perhaps better-behaved numerically, than the more
+general calculations we implement here. Because the Rimphony implemention is
+largely motivated by my interest in non-isotropic distributions, I have not
+implemented the isotropic calculations here.
+
 */
 
 use gsl;
