@@ -18,7 +18,6 @@
 #include <math.h>
 #include <gsl/gsl_sf_bessel.h>
 
-
 /* Compute `f_factor * exp(f_exp)` with some extra precision and safety. */
 static inline double
 exp_factor(const double f_factor, const double f_exp)
@@ -260,10 +259,12 @@ my_Bessel_J(const double n, const double x)
 
         return BesselJ_Debye_Eps_Exp(n, x);
     } else {
-        double y = log10((x - n) / x);
+        if (x != n) {
+            double y = log10((x - n) / x);
 
-        if (x != n && y > SLOPE3 * logn + INTERCEPT3)
-            return BesselJ_Meissel_Second(n, x);
+            if (y > SLOPE3 * logn + INTERCEPT3)
+                return BesselJ_Meissel_Second(n, x);
+        }
 
         return BesselJ_Debye_Eps_Exp(n, x);
     }
