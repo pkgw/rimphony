@@ -115,7 +115,7 @@ impl PitchyPowerLawDistribution {
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use std::f64;
 
     use super::PitchyPowerLawDistribution;
