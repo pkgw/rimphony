@@ -92,6 +92,18 @@ fn powerlaw_av_0(b: &mut Bencher) {
     });
 }
 
+fn powerlaw_fq_0(b: &mut Bencher) {
+    b.iter(|| {
+        powerlaw_inner(Coefficient::Faraday, Stokes::Q, 0);
+    });
+}
+
+fn powerlaw_fv_0(b: &mut Bencher) {
+    b.iter(|| {
+        powerlaw_inner(Coefficient::Faraday, Stokes::V, 0);
+    });
+}
+
 
 // A smattering of other parameter configurations.
 
@@ -131,11 +143,25 @@ fn powerlaw_av_2(b: &mut Bencher) {
     });
 }
 
+fn powerlaw_fq_3(b: &mut Bencher) {
+    b.iter(|| {
+        powerlaw_inner(Coefficient::Faraday, Stokes::Q, 3);
+    });
+}
+
+fn powerlaw_fv_4(b: &mut Bencher) {
+    b.iter(|| {
+        powerlaw_inner(Coefficient::Faraday, Stokes::V, 4);
+    });
+}
+
 
 benchmark_group!(powerlaw_0,
                  powerlaw_ji_0, powerlaw_jq_0, powerlaw_jv_0,
-                 powerlaw_ai_0, powerlaw_aq_0, powerlaw_av_0);
+                 powerlaw_ai_0, powerlaw_aq_0, powerlaw_av_0,
+                 powerlaw_fq_0, powerlaw_fv_0);
 benchmark_group!(powerlaw_others,
                  powerlaw_ji_1, powerlaw_jq_2, powerlaw_jv_3,
-                 powerlaw_ai_4, powerlaw_aq_1, powerlaw_av_2);
+                 powerlaw_ai_4, powerlaw_aq_1, powerlaw_av_2,
+                 powerlaw_fq_3, powerlaw_fv_4);
 benchmark_main!(powerlaw_0, powerlaw_others);
