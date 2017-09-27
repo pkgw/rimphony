@@ -86,7 +86,9 @@ impl PowerLawDistribution {
     }
 
     /// Compute the normalization factor. The definition of our distribution
-    /// function is such that the integral
+    /// function is such that the integral over gamma, with the momentum-space
+    /// conversion factor of gamma^2*beta, should be 1 / 4pi (since we’re
+    /// isotropic).
     fn normalize(&mut self) {
         let mut ws = gsl::IntegrationWorkspace::new(1000);
         let integral = ws.qag(|g| g.powf(-self.p) * (-g * self.inv_gamma_cutoff).exp(),
@@ -174,12 +176,12 @@ mod tests {
     use ::{Coefficient, DistributionFunction, Stokes, SynchrotronCalculator, gsl};
     use super::PowerLawDistribution;
 
-    /// Our distributions should integrated to unity in gamma/cos-xi space
+    /// Our distributions should integrate to unity in gamma/cos-xi space
     /// when the momentum volume unit of gamma^2*beta is included in the
     /// integrand. The full distribution function in momentum space is our
     /// distribution function divided by (m_e c)^3.
     #[test]
-    fn test_normalization() {
+    fn pl_normalization() {
         let mut d = PowerLawDistribution::new(2.5).gamma_limits(10., 1e12, 1e10);
         d.normalize();
 
@@ -194,7 +196,7 @@ mod tests {
     }
 
     #[test]
-    fn test_hs11_high_freq_rho_q() {
+    fn pl_hs11_high_freq_rho_q() {
         let mut d = PowerLawDistribution::new(2.5).gamma_limits(10., 1e12, 1e10);
         let apx = d.high_freq_approximation();
         let p = apx.compute_dimensionless(Coefficient::Faraday, Stokes::Q, 1e4, 0.25 * PI);
@@ -203,7 +205,7 @@ mod tests {
     }
 
     #[test]
-    fn test_heyvaerts_high_freq_rho_q() {
+    fn pl_heyvaerts_high_freq_rho_q() {
         let d = PowerLawDistribution::new(2.5).gamma_limits(10., 1e12, 1e10);
         let full = d.full_calculation();
         let p = full.compute_dimensionless(Coefficient::Faraday, Stokes::Q, 1e4, 0.25 * PI);
@@ -218,7 +220,7 @@ mod tests {
     /// possible even for larger values of gamma_min, but you just can't tell
     /// from the plot.
     #[test]
-    fn test_hs11_high_freq_rho_v() {
+    fn pl_hs11_high_freq_rho_v() {
         let mut d = PowerLawDistribution::new(2.5).gamma_limits(10., 1e12, 1e10);
         let apx = d.high_freq_approximation();
         let p = apx.compute_dimensionless(Coefficient::Faraday, Stokes::V, 1e4, 0.25 * PI);
@@ -227,7 +229,7 @@ mod tests {
     }
 
     #[test]
-    fn test_heyvaerts_high_freq_rho_v() {
+    fn pl_heyvaerts_high_freq_rho_v() {
         let d = PowerLawDistribution::new(2.5).gamma_limits(10., 1e12, 1e10);
         let full = d.full_calculation();
         let p = full.compute_dimensionless(Coefficient::Faraday, Stokes::V, 1e4, 0.25 * PI);
