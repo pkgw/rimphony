@@ -17,7 +17,7 @@ use special_fun::FloatSpecial;
 use std::f64;
 
 use super::{Coefficient, DistributionFunction, Stokes};
-use super::{ELECTRON_CHARGE, SPEED_LIGHT};
+use super::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT};
 
 const FOUR_OVER_SQRT_3: f64 = 2.3094010767585034; // 4/sqrt(3)
 const INVERSE_C: f64 = 1. / SPEED_LIGHT;
@@ -217,7 +217,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         // Final scalings:
 
         2. * ELECTRON_CHARGE.powi(2) * (nr_val + qr_val) /
-            (self.s * self.sin_observer_angle).powi(2)
+            (MASS_ELECTRON * (self.s * self.sin_observer_angle).powi(2))
     }
 
     #[inline]
@@ -339,7 +339,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
     fn dfdsigma(&self) -> f64 {
         let (dfdg, dfdcxi) = self.d.calc_f_derivatives(self.gamma, self.mu);
 
-        let g_term = dfdg / self.sigma0_sq;
+        let g_term = dfdg / (self.sigma0 * self.sin_observer_angle);
 
         let mu_term = if dfdcxi == 0. {
             0.
