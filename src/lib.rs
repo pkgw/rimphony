@@ -185,6 +185,9 @@ pub use power_law::PowerLawDistribution;
 pub mod pitchy_pl;
 pub use pitchy_pl::PitchyPowerLawDistribution;
 
+pub mod thermal_juettner;
+pub use thermal_juettner::ThermalJuettnerDistribution;
+
 
 /// The FullSunchrotronCalculator implements the fully detailed
 /// double-integral calculation.
