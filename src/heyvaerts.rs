@@ -44,6 +44,47 @@ fn k13l13(x: f64) -> f64 {
     COEFF * (minus - plus) * (minus + plus)
 }
 
+/// This is K_{2/3}(x) * L_{1/3}(x)
+///
+/// Here K is the modified Bessel function of the second kind and L is a
+/// similar construction. We use the approximation provided by Heyvaerts.
+///
+/// TODO: document where the approximation is valid.
+///
+/// TODO: any advantages if we do the numerics as the difference of two squares?
+///
+/// This appproximation is only supposed to kick in when x <~ 1., but I have
+/// cases where I have x ~ 15. I think what's happening is that the NR/QR
+/// structure of the problem is weird (sigma_QR_min < sigma_0) and Heyvaert's
+/// assumptions about the problem geometry aren't so valid.
+fn k23l13(x: f64) -> f64 {
+    let k_term = if x < 10. {
+        f64::consts::PI * INVERSE_SQRT_3 * (x.besseli(-2./3.) - x.besseli(2./3.))
+    } else {
+        // Blah. The Amos Fortran library has a routine called ZBESK that
+        // seems capable of computing K_{2/3}, but I don't see any routines
+        // that I can easily incorporate here. (As best I can tell the Scipy
+        // `kv()` bessel routine eventually delegates to Amos.) But Wikipedia
+        // says that you can evaluate K_{2/3} with the following "rapidly
+        // converged" integral, so let's do that. Hopefully this codepath
+        // won't be triggered often anyway.
+
+        let mut ws = gsl::IntegrationWorkspace::new(128);
+        INVERSE_SQRT_3 * ws.qagiu(|q| {
+            let r = q.powi(2) / 3.;
+            (3. + 6. * r) * (-x * (1. + 4. * r) * (1. + r).sqrt()).exp() / (1. + r).sqrt()
+        }, 0.)
+            .tolerance(0., 1e-5)
+            .compute()
+            .map(|r| r.value)
+            .unwrap_or(f64::NAN)
+    };
+
+    let l_term = f64::consts::PI * INVERSE_SQRT_3 * (x.besseli(-1./3.) + x.besseli(1./3.));
+
+    k_term * l_term
+}
+
 /// This is K_{2/3}(x) * L_{2/3}(x)
 ///
 /// Here K is the modified Bessel function of the second kind and L is a
@@ -106,11 +147,6 @@ pub fn compute_dimensionless<D: DistributionFunction>(distrib: &D, coeff: Coeffi
 
 impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
     pub fn compute(&mut self) -> f64 {
-        // XXX TEMP
-        if self.stokes == Stokes::V {
-            return 0.;
-        }
-
         let mut ows = gsl::IntegrationWorkspace::new(4096); // outer workspace
         let mut iws = gsl::IntegrationWorkspace::new(4096); // inner workspace
 
@@ -248,20 +284,35 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             return 0.;
         }
 
-        let inner = match self.stokes {
-            Stokes::Q => |s| {
-                self.fill_coord_vars(s, pomega);
-                self.h_nr_element()
+        match self.stokes {
+            Stokes::Q => {
+                let inner = |s| {
+                    self.fill_coord_vars(s, pomega);
+                    self.h_nr_element() // <= note "h" here
+                };
+                ws.qag(inner, sigma_min, sigma_max)
+                    .tolerance(0., 1e-3)
+                    .rule(gsl::IntegrationRule::GaussKonrod31)
+                    .compute()
+                    .map(|r| r.value)
+                    .unwrap_or(f64::NAN)
             },
-            _ => panic!("not implemented")
-        };
 
-        ws.qag(inner, sigma_min, sigma_max)
-            .tolerance(0., 1e-3)
-            .rule(gsl::IntegrationRule::GaussKonrod31)
-            .compute()
-            .map(|r| r.value)
-            .unwrap_or(f64::NAN)
+            Stokes::V => {
+                let inner = |s| {
+                    self.fill_coord_vars(s, pomega);
+                    self.f_nr_element() // <= note "f" here
+                };
+                ws.qag(inner, sigma_min, sigma_max)
+                    .tolerance(0., 1e-3)
+                    .rule(gsl::IntegrationRule::GaussKonrod31)
+                    .compute()
+                    .map(|r| r.value)
+                    .unwrap_or(f64::NAN)
+            },
+
+            _ => panic!("undefined")
+        }
     }
 
     #[inline]
@@ -279,20 +330,35 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         let pomega_max_qr = (sigma.powi(2) - self.sigma0_sq).sqrt();
         let pomega_max = pomega_max_phys.min(pomega_max_qr);
 
-        let inner = match self.stokes {
-            Stokes::Q => |p| {
-                self.fill_coord_vars(sigma, p);
-                self.h_qr_element()
+        match self.stokes {
+            Stokes::Q => {
+                let inner = |p| {
+                    self.fill_coord_vars(sigma, p);
+                    self.h_qr_element() // <= note "h" here
+                };
+                ws.qag(inner, -pomega_max, pomega_max)
+                    .tolerance(0., 1e-3)
+                    .rule(gsl::IntegrationRule::GaussKonrod31)
+                    .compute()
+                    .map(|r| r.value)
+                    .unwrap_or(f64::NAN)
             },
-            _ => panic!("not implemented")
-        };
 
-        ws.qag(inner, -pomega_max, pomega_max)
-            .tolerance(0., 1e-3)
-            .rule(gsl::IntegrationRule::GaussKonrod31)
-            .compute()
-            .map(|r| r.value)
-            .unwrap_or(f64::NAN)
+            Stokes::V => {
+                let inner = |p| {
+                    self.fill_coord_vars(sigma, p);
+                    self.f_qr_element() // <= note "f" here
+                };
+                ws.qag(inner, -pomega_max, pomega_max)
+                    .tolerance(0., 1e-3)
+                    .rule(gsl::IntegrationRule::GaussKonrod31)
+                    .compute()
+                    .map(|r| r.value)
+                    .unwrap_or(f64::NAN)
+            },
+
+            _ => panic!("undefined")
+        }
     }
 
     /// The quasi-resonant (QR) approximation of the "h" (Faraday Q) coefficient.
@@ -310,7 +376,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
 
         let dfds = self.dfdsigma();
 
-        return INVERSE_C * (t1 + t2 + t3) * dfds;
+        INVERSE_C * (t1 + t2 + t3) * dfds
     }
 
     /// The nonresonant (NR) approximation of the "h" (Faraday Q) coefficient.
@@ -331,7 +397,41 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
 
         let dfds = self.dfdsigma();
 
-        return f64::consts::PI * INVERSE_C * u1 * dfds;
+        f64::consts::PI * INVERSE_C * u1 * dfds
+    }
+
+    /// The quasi-resonant (QR) approximation of the "f" (Faraday V) coefficient.
+    ///
+    /// Heyvaerts equation 99 with the standard prefactorization that we have
+    /// chosen, and moving the "x" inside the parentheses.
+    fn f_qr_element(&self) -> f64 {
+        let g = SQRT_8_OVER_3 * (self.sigma - self.x).powf(1.5) / self.x.sqrt();
+        let z = g * k23l13(g) - f64::consts::PI;
+
+        let dfds = self.dfdsigma();
+
+        -2. * INVERSE_C * z * self.pomega * dfds
+    }
+
+    /// The nonresonant (NR) approximation of the "f" (Faraday V) coefficient.
+    ///
+    /// Heyvaerts equation 115 with the standard prefactorization that we have
+    /// chosen. Note that there's a 1/pi inside the integral as written there.
+    fn f_nr_element(&self) -> f64 {
+        let s_sq = self.sigma.powi(2);
+        let x_sq = self.x.powi(2);
+        let ssqmxsq = s_sq - x_sq;
+        let a1 = 1. / 8. - 5. / 24. * s_sq / ssqmxsq;
+        let a2 = 3. / 128. - 77. / 576. * s_sq / ssqmxsq + 385. / 3456. * (s_sq / ssqmxsq).powi(2);
+        let xa1p = -5. / 12. * s_sq * x_sq / ssqmxsq.powi(2);
+        let z =
+            0.5 * x_sq / ssqmxsq.powf(1.5)
+            + (6. * a2 + xa1p - a1.powi(2)) / ssqmxsq
+            + 1.5 * a1 * x_sq / ssqmxsq.powi(2);
+
+        let dfds = self.dfdsigma();
+
+        -2. * f64::consts::PI * INVERSE_C * z * self.pomega * dfds
     }
 
     /// The derivative of the distribution function with regards to the

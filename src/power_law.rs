@@ -132,6 +132,7 @@ impl<'a> SynchrotronCalculator for HighFrequencyApproximation<'a> {
         match (coeff, stokes) {
             (Coefficient::Faraday, Stokes::I) => f64::NAN,
             (Coefficient::Faraday, Stokes::Q) => self.faraday_q(s, theta),
+            (Coefficient::Faraday, Stokes::V) => self.faraday_v(s, theta),
             (_, _) => f64::NAN,
         }
     }
@@ -149,6 +150,19 @@ impl<'a> HighFrequencyApproximation<'a> {
             ((s / (theta.sin() * self.0.gamma_min.powi(2))).powf((self.0.p - 2.) / 2.) - 1.) *
             (self.0.p - 1.) / self.0.gamma_min.powf(1. - self.0.p) *
             (theta.sin() / s).powf((self.0.p + 2.) / 2.)
+    }
+
+    /// From Huang & Shcherbakov (2011) equation 51.
+    ///
+    /// This one is not so useful for reproducing their Figure 6 since it's
+    /// nigh impossible to read accurate quantitative values for rho_V off of
+    /// their plot.
+    fn faraday_v(&self, s: f64, theta: f64) -> f64 {
+        0.017
+            * (self.0.gamma_min.ln() * (self.0.p - 1.))
+            / ((self.0.p + 1.) * self.0.gamma_min.powi(2))
+            / s
+            * theta.sin()
     }
 }
 
@@ -194,6 +208,30 @@ mod tests {
         let full = d.full_calculation();
         let p = full.compute_dimensionless(Coefficient::Faraday, Stokes::Q, 1e4, 0.25 * PI);
         const EXPECTED: f64 = 1.89e-9;
+        assert_approx_eq!(p, EXPECTED, 0.01 * EXPECTED);
+    }
+
+    /// Note that this disagrees with the full integration somewhat
+    /// substantially, but as best I can convince myself, the full integration
+    /// is just more correct here. As per the left panel of HS11 Figure 6, the
+    /// approximation does not do a very good job for gamma_min <~ 100 (and
+    /// possible even for larger values of gamma_min, but you just can't tell
+    /// from the plot.
+    #[test]
+    fn test_hs11_high_freq_rho_v() {
+        let mut d = PowerLawDistribution::new(2.5).gamma_limits(10., 1e12, 1e10);
+        let apx = d.high_freq_approximation();
+        let p = apx.compute_dimensionless(Coefficient::Faraday, Stokes::V, 1e4, 0.25 * PI);
+        const EXPECTED: f64 = 1.19e-8;
+        assert_approx_eq!(p, EXPECTED, 0.01 * EXPECTED);
+    }
+
+    #[test]
+    fn test_heyvaerts_high_freq_rho_v() {
+        let d = PowerLawDistribution::new(2.5).gamma_limits(10., 1e12, 1e10);
+        let full = d.full_calculation();
+        let p = full.compute_dimensionless(Coefficient::Faraday, Stokes::V, 1e4, 0.25 * PI);
+        const EXPECTED: f64 = 5.28e-8;
         assert_approx_eq!(p, EXPECTED, 0.01 * EXPECTED);
     }
 }
