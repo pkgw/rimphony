@@ -165,7 +165,9 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                     .unwrap_or(f64::NAN);
 
                 if rel_deriv == 0. || (1. / (rel_deriv * delta_sigma)).abs() > DELTA_SCALE_FACTOR {
-                    delta_sigma *= DELTA_SCALE_FACTOR;
+                    if delta_sigma < 1e6 * self.sigma0 {
+                        delta_sigma *= DELTA_SCALE_FACTOR;
+                    }
                 }
             }
 
