@@ -216,6 +216,9 @@ pub use power_law::PowerLawDistribution;
 pub mod pitchy_pl;
 pub use pitchy_pl::PitchyPowerLawDistribution;
 
+pub mod pitchy_kappa;
+pub use pitchy_kappa::PitchyKappaDistribution;
+
 pub mod thermal_juettner;
 pub use thermal_juettner::ThermalJuettnerDistribution;
 
