@@ -133,6 +133,12 @@ fn main() {
         const WIDTH: f64 = 3.;
         const GAMMA_CUTOFF: f64 = 1e10;
 
+        // Log the parameters so we can reconstruct cases that fail.
+        write!(file, "{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}",
+               s, theta, kappa, k
+        ).expect("write error");
+        file.flush().expect("flush error");
+
         let t0 = Instant::now();
         let vals = PitchyKappaDistribution::new(kappa, WIDTH, k)
             .gamma_cutoff(GAMMA_CUTOFF)
@@ -142,11 +148,10 @@ fn main() {
         let ms = elapsed.as_secs() as f64 * 1000. + elapsed.subsec_nanos() as f64 * 1e-6;
 
         writeln!(file,
-                 "{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t\
-                  {:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t\
-                  {:.16e}",
-                 s, theta, kappa, k, ms,
-                 vals[0], vals[1], vals[2], vals[3], vals[4], vals[5], vals[6], vals[7]
+                 "\t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\
+                 \t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}",
+                 ms, vals[0], vals[1], vals[2], vals[3],
+                 vals[4], vals[5], vals[6], vals[7]
         ).expect("write error");
     }
 }
