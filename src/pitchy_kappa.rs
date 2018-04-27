@@ -103,21 +103,13 @@ impl PitchyKappaDistribution {
             };
 
             // For (e.g.) kappa=1.9872387622824355e0 and width=3.0, QAGIU
-            // fails to evaluate the integral from 1 to infinity. I don't
-            // quite understand why since the integrand looks perfectly
-            // well-behaved to me; I think the problem is that a non-log X
-            // axis it's true that the integrand peaks extremely close to the
-            // lower limit. Anyway, breaking the integral into two pieces
-            // avoids the problem.
+            // fails to evaluate the integral from 1 to infinity. This
+            // surprises me since the integrand is nicely behaved. But
+            // whatever; it works fine to use a definite integral.
 
-            let i1 = ws.qag(&fg, 1., 1000.)
-                .tolerance(0., 1e-8)
-                .rule(gsl::IntegrationRule::GaussKonrod31)
-                .compute()
-                .map(|r| r.value)
-                .unwrap();
+            let g_cut = 1. / self.inv_gamma_cutoff;
 
-            i1 + ws.qagiu(&fg, 1000.)
+            ws.qag(&fg, 1., 1e3 * g_cut)
                 .tolerance(0., 1e-8)
                 .rule(gsl::IntegrationRule::GaussKonrod31)
                 .compute()
