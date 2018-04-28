@@ -1,0 +1,13 @@
+# Copyright 2018 Peter Williams <peter@newton.cx> and collaborators
+# Licensed under the GPL version 3.
+
+[package]
+name = "rimphony-test-support"
+version = "0.1.0"
+authors = ["Peter Williams <peter@newton.cx>"]
+license = "GPLv3"
+
+[dependencies]
+slog = "^2.2"
+slog-async = "^2.3"
+slog-term = "^2.4"

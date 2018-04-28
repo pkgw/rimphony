@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 /*! A power-law distribution function with a sine-power pitch angle dependence.
@@ -9,6 +9,7 @@ angle)^k` for a configurable *k*.
 
 */
 
+use slog::Logger;
 use std::f64;
 
 use gsl;
@@ -91,7 +92,7 @@ impl PitchyPowerLawDistribution {
     /// Create a SynchrotronCalculator from this set of parameters. The
     /// calculator will use the full, detailed double integral calculation to
     /// evaluate all coefficients.
-    pub fn full_calculation(mut self) -> FullSynchrotronCalculator<Self> {
+    pub fn full_calculation(mut self, logger: Logger) -> FullSynchrotronCalculator<Self> {
         // We can compute the pitch-angle normalization factor analytically.
 
         let pa_integral = gsl::hypergeometric_2F1(0.5, -0.5 * self.k, 1.5, 1.);
@@ -110,12 +111,13 @@ impl PitchyPowerLawDistribution {
         self.norm = 1. / (2. * TWO_PI * pa_integral * gamma_integral);
 
         // Ready to go.
-        FullSynchrotronCalculator(self)
+        FullSynchrotronCalculator { distrib: self, logger }
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use rimphony_test_support;
     use std::f64;
 
     use super::PitchyPowerLawDistribution;
@@ -138,16 +140,18 @@ mod tests {
     const N_CALCS_PER_TEST: usize = 2;
 
     fn test_k_zero(mut base: usize, coeff: Coefficient, stokes: Stokes) {
+        let log = rimphony_test_support::default_log();
+
         for _ in 0..N_CALCS_PER_TEST {
             let s = SS[CHOICES[base + 0]];
             let theta = THETAS[CHOICES[base + 1]];
             let p = PS[CHOICES[base + 2]];
 
             let pl = PowerLawDistribution::new(p)
-                .full_calculation()
+                .full_calculation(log.clone())
                 .compute_dimensionless(coeff, stokes, s, theta);
             let us = PitchyPowerLawDistribution::new(p, 0.)
-                .full_calculation()
+                .full_calculation(log.clone())
                 .compute_dimensionless(coeff, stokes, s, theta);
 
             assert_approx_eq!(pl, us);

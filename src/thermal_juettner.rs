@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 /*! A thermal Jüttner distribution.
@@ -8,6 +8,7 @@ to their rest-mass energy.
 
 */
 
+use slog::Logger;
 use special_fun::FloatSpecial;
 use std::f64;
 
@@ -65,9 +66,9 @@ impl ThermalJuettnerDistribution {
     /// Create a SynchrotronCalculator from this set of parameters. The
     /// calculator will use the full, detailed double integral calculation to
     /// evaluate all coefficients.
-    pub fn full_calculation(mut self) -> FullSynchrotronCalculator<Self> {
+    pub fn full_calculation(mut self, logger: Logger) -> FullSynchrotronCalculator<Self> {
         self.normalize();
-        FullSynchrotronCalculator(self)
+        FullSynchrotronCalculator { distrib: self, logger }
     }
 
     /// Create a SynchrotronCalculator from this set of parameters that uses
@@ -143,6 +144,7 @@ impl<'a> HighFrequencyApproximation<'a> {
 
 #[cfg(test)]
 mod tests {
+    use rimphony_test_support;
     use std::f64::consts::PI;
 
     use ::{Coefficient, DistributionFunction, Stokes, SynchrotronCalculator, gsl};
@@ -181,7 +183,7 @@ mod tests {
     #[test]
     fn tj_heyvaerts_high_freq_rho_q() {
         let d = ThermalJuettnerDistribution::new(10.);
-        let full = d.full_calculation();
+        let full = d.full_calculation(rimphony_test_support::default_log());
         let p = full.compute_dimensionless(Coefficient::Faraday, Stokes::Q, 4e4, 0.4);
         const EXPECTED: f64 = 4.8081e-11;
         assert_approx_eq!(p, EXPECTED, 0.01 * EXPECTED);
@@ -201,7 +203,7 @@ mod tests {
     #[test]
     fn tj_heyvaerts_high_freq_rho_v() {
         let d = ThermalJuettnerDistribution::new(0.1);
-        let full = d.full_calculation();
+        let full = d.full_calculation(rimphony_test_support::default_log());
         let p = full.compute_dimensionless(Coefficient::Faraday, Stokes::V, 40., 0.5);
         const EXPECTED: f64 = 3.064e-4;
         assert_approx_eq!(p, EXPECTED, 0.01 * EXPECTED);

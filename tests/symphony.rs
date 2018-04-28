@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 /// Check our numbers against Symphony's.
@@ -10,6 +10,7 @@
 extern crate rand;
 extern crate regex;
 extern crate rimphony;
+extern crate rimphony_test_support;
 
 use rimphony::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI,
                Coefficient, Stokes, SynchrotronCalculator};
@@ -32,6 +33,7 @@ fn compare_powerlaw_subset(coeff: Coefficient, stokes: Stokes, cname: &str, inde
     const GAMMA_MAX: f64 = 1e12;
     const GAMMA_CUTOFF: f64 = 1e10;
 
+    let log = rimphony_test_support::default_log();
     let re = regex::Regex::new(r"\s+").unwrap();
 
     let mut p = PathBuf::from(TOP);
@@ -54,7 +56,7 @@ fn compare_powerlaw_subset(coeff: Coefficient, stokes: Stokes, cname: &str, inde
         let t0 = Instant::now();
         let ours = rimphony::PowerLawDistribution::new(p)
             .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-            .full_calculation()
+            .full_calculation(log.clone())
             .compute_cgs(coeff, stokes, NU, bfield, N_E, theta);
 
         let elapsed = t0.elapsed();

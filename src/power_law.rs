@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 /*! The power-law distribution function.
@@ -14,6 +14,7 @@ cutoff at `gamma_max`.
 
 */
 
+use slog::Logger;
 use std::f64;
 
 use gsl;
@@ -104,9 +105,9 @@ impl PowerLawDistribution {
     /// Create a SynchrotronCalculator from this set of parameters. The
     /// calculator will use the full, detailed double integral calculation to
     /// evaluate all coefficients.
-    pub fn full_calculation(mut self) -> FullSynchrotronCalculator<Self> {
+    pub fn full_calculation(mut self, logger: Logger) -> FullSynchrotronCalculator<Self> {
         self.normalize();
-        FullSynchrotronCalculator(self)
+        FullSynchrotronCalculator { distrib: self, logger }
     }
 
     /// Create a SynchrotronCalculator from this set of parameters that uses
@@ -171,6 +172,7 @@ impl<'a> HighFrequencyApproximation<'a> {
 
 #[cfg(test)]
 mod tests {
+    use rimphony_test_support;
     use std::f64::consts::PI;
 
     use ::{Coefficient, DistributionFunction, Stokes, SynchrotronCalculator, gsl};
@@ -207,7 +209,7 @@ mod tests {
     #[test]
     fn pl_heyvaerts_high_freq_rho_q() {
         let d = PowerLawDistribution::new(2.5).gamma_limits(10., 1e12, 1e10);
-        let full = d.full_calculation();
+        let full = d.full_calculation(rimphony_test_support::default_log());
         let p = full.compute_dimensionless(Coefficient::Faraday, Stokes::Q, 1e4, 0.25 * PI);
         const EXPECTED: f64 = 1.89e-9;
         assert_approx_eq!(p, EXPECTED, 0.01 * EXPECTED);
@@ -231,7 +233,7 @@ mod tests {
     #[test]
     fn pl_heyvaerts_high_freq_rho_v() {
         let d = PowerLawDistribution::new(2.5).gamma_limits(10., 1e12, 1e10);
-        let full = d.full_calculation();
+        let full = d.full_calculation(rimphony_test_support::default_log());
         let p = full.compute_dimensionless(Coefficient::Faraday, Stokes::V, 1e4, 0.25 * PI);
         const EXPECTED: f64 = 5.28e-8;
         assert_approx_eq!(p, EXPECTED, 0.01 * EXPECTED);

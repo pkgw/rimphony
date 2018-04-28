@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 /*! Use the "symphony" approach to calculate synchrotron emission and absorption coefficients.
@@ -16,6 +16,7 @@ use std::f64;
 
 use gsl;
 use leung_bessel;
+use slog::Logger;
 use super::{Coefficient, DistributionFunction, Stokes};
 use super::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI};
 
@@ -27,9 +28,10 @@ enum StokesVSwitch {
     NegativeLobe,
 }
 
-#[derive(Copy,Clone,Debug,PartialEq)]
+#[derive(Clone, Debug)]
 struct CalculationState<'a, D: 'a> {
     d: &'a D,
+    logger: &'a Logger,
     coeff: Coefficient,
     stokes: Stokes,
     s: f64,
@@ -39,9 +41,12 @@ struct CalculationState<'a, D: 'a> {
 }
 
 
-pub fn compute_dimensionless<D: DistributionFunction>(distrib: &D, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> f64 {
+pub fn compute_dimensionless<'a, D: DistributionFunction>(
+    distrib: &'a D, logger: &'a Logger, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64
+) -> f64 {
     CalculationState {
         d: distrib,
+        logger: logger,
         coeff: coeff,
         stokes: stokes,
         s: s,
@@ -55,6 +60,14 @@ pub fn compute_dimensionless<D: DistributionFunction>(distrib: &D, coeff: Coeffi
 impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
     pub fn compute(&mut self) -> f64 {
         const N_MAX: f64 = 30.;
+
+        trace!(self.logger, "beginning computation";
+               "distrib" => ?self.d,
+               "coeff" => ?self.coeff,
+               "stokes" => ?self.stokes,
+               "s" => self.s,
+               "cos_theta" => self.cos_observer_angle,
+        );
 
         // This function used to be "n_summation" in symphony's integrate.c.
 

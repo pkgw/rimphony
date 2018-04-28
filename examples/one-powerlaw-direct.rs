@@ -1,10 +1,11 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 /// Compute one coefficient for the power-law distribution, using the same
 /// parameters that are fed directly into Symphony.
 
 extern crate rimphony;
+extern crate rimphony_test_support;
 
 use rimphony::{Coefficient, Stokes, SynchrotronCalculator};
 
@@ -22,7 +23,7 @@ fn main() {
 
     let ji = rimphony::PowerLawDistribution::new(P)
         .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-        .full_calculation()
+        .full_calculation(rimphony_test_support::default_log())
         .compute_cgs(Coefficient::Emission, Stokes::I, NU, B, N_E, THETA);
 
     println!("Symphony j_I: {:e}   Ours: {:e}", SYMPHONY_JI, ji);

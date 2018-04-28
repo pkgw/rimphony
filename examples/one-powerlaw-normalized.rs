@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 /// Compute one coefficient for the power-law distribution, using normalized
@@ -6,6 +6,7 @@
 /// problem.
 
 extern crate rimphony;
+extern crate rimphony_test_support;
 
 use rimphony::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI,
                Coefficient, Stokes, SynchrotronCalculator};
@@ -28,7 +29,7 @@ fn main() {
 
     let val = rimphony::PowerLawDistribution::new(P)
         .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-        .full_calculation()
+        .full_calculation(rimphony_test_support::default_log())
         .compute_cgs(COEFF, STOKES, NU, B, N_E, THETA);
 
     let remove_units = match COEFF {

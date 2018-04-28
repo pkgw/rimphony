@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 /*! Calculate radiative transfer coefficients for synchrotron emission.
@@ -39,11 +39,14 @@ with checking results.
 extern crate gsl_sys;
 extern crate leung_bessel;
 extern crate special_fun;
+#[macro_use] extern crate slog;
 
 #[cfg(test)] #[macro_use] extern crate assert_approx_eq;
 #[cfg(test)] extern crate rand;
+#[cfg(test)] extern crate rimphony_test_support;
 
 use std::f64;
+use std::fmt;
 
 mod gsl;
 mod heyvaerts;
@@ -103,10 +106,9 @@ pub enum Coefficient {
     Faraday,
 }
 
-
 /// An electron distribution function. We can compute synchrotron coefficients
 /// using different distributions.
-pub trait DistributionFunction {
+pub trait DistributionFunction: fmt::Debug {
     /// This function gives the modified distribution function `d(n_e) /
     /// [d(gamma) d(cos xi) d(phi)]`. In all the cases in Symphony, isotropy
     /// and gyrotropy are assumed, so the `d(cos xi) d(phi)` becomes 1/4π.
@@ -225,9 +227,11 @@ pub use thermal_juettner::ThermalJuettnerDistribution;
 
 /// The FullSunchrotronCalculator implements the fully detailed
 /// double-integral calculation.
-#[derive(Copy,Clone,Debug,Eq,Hash,PartialEq)]
-pub struct FullSynchrotronCalculator<D>(D);
-
+#[derive(Clone, Debug)]
+pub struct FullSynchrotronCalculator<D> {
+    distrib: D,
+    logger: slog::Logger,
+}
 
 impl<D: DistributionFunction> SynchrotronCalculator for FullSynchrotronCalculator<D> {
     fn compute_dimensionless(&self, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64) -> f64 {
@@ -235,9 +239,9 @@ impl<D: DistributionFunction> SynchrotronCalculator for FullSynchrotronCalculato
             (Coefficient::Faraday, Stokes::I) =>
                 f64::NAN,
             (Coefficient::Emission, _)|(Coefficient::Absorption, _) =>
-                symphony::compute_dimensionless(&self.0, coeff, stokes, s, theta),
+                symphony::compute_dimensionless(&self.distrib, &self.logger, coeff, stokes, s, theta),
             (Coefficient::Faraday, _) =>
-                heyvaerts::compute_dimensionless(&self.0, coeff, stokes, s, theta),
+                heyvaerts::compute_dimensionless(&self.distrib, coeff, stokes, s, theta), // XXX LOG
         }
     }
 }

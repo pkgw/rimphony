@@ -15,6 +15,7 @@ XXX THIS NEEDS MORE TESTING.
 
 */
 
+use slog::Logger;
 use std::f64;
 
 use gsl;
@@ -86,7 +87,7 @@ impl PitchyKappaDistribution {
     /// Create a SynchrotronCalculator from this set of parameters. The
     /// calculator will use the full, detailed double integral calculation to
     /// evaluate all coefficients.
-    pub fn full_calculation(mut self) -> FullSynchrotronCalculator<Self> {
+    pub fn full_calculation(mut self, logger: Logger) -> FullSynchrotronCalculator<Self> {
         // We can compute the pitch-angle normalization factor analytically.
 
         let pa_integral = gsl::hypergeometric_2F1(0.5, -0.5 * self.k, 1.5, 1.);
@@ -120,7 +121,7 @@ impl PitchyKappaDistribution {
         self.norm = 1. / (2. * TWO_PI * pa_integral * gamma_integral);
 
         // Ready to go.
-        FullSynchrotronCalculator(self)
+        FullSynchrotronCalculator { distrib: self, logger }
     }
 }
 

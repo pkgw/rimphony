@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 /// Crank out coefficients for the "pitchy" power law distribution.
@@ -6,6 +6,7 @@
 extern crate clap;
 extern crate rand;
 extern crate rimphony;
+extern crate rimphony_test_support;
 
 use rimphony::{PitchyPowerLawDistribution, SynchrotronCalculator};
 use std::fs::OpenOptions;
@@ -90,6 +91,7 @@ fn main() {
         .get_matches();
 
     let outfile = PathBuf::from(matches.value_of_os("OUTFILE").unwrap());
+    let log = rimphony_test_support::default_log();
 
     let s_sampler = Sampler::new(
         true,
@@ -130,7 +132,7 @@ fn main() {
         let t0 = Instant::now();
         let vals = PitchyPowerLawDistribution::new(p, k)
             .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-            .full_calculation()
+            .full_calculation(log.clone())
             .compute_all_dimensionless(s, theta);
         let elapsed = t0.elapsed();
         let ms = elapsed.as_secs() as f64 * 1000. + elapsed.subsec_nanos() as f64 * 1e-6;
