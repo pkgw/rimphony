@@ -12,6 +12,8 @@ use slog::Drain;
 pub fn default_log() -> slog::Logger {
     let decorator = slog_term::TermDecorator::new().build();
     let drain = slog_term::FullFormat::new(decorator).build().fuse();
-    let drain = slog_async::Async::new(drain).build().fuse();
+    let drain = slog_async::Async::new(drain)
+        .overflow_strategy(slog_async::OverflowStrategy::Block)
+        .build().fuse();
     slog::Logger::root(drain, o!())
 }
