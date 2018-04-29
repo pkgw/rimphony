@@ -44,24 +44,30 @@ struct CalculationState<'a, D: 'a> {
 pub fn compute_dimensionless<'a, D: DistributionFunction>(
     distrib: &'a D, logger: &'a Logger, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64
 ) -> f64 {
-    CalculationState {
-        d: distrib,
-        logger: logger,
-        coeff: coeff,
-        stokes: stokes,
-        s: s,
-        cos_observer_angle: theta.cos(),
-        sin_observer_angle: theta.sin(),
-        stokes_v_switch: StokesVSwitch::Inactive,
-    }.compute()
+    CalculationState::new(distrib, logger, coeff, stokes, s, theta).compute()
 }
 
 
 impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
+    pub fn new(
+        distrib: &'a D, logger: &'a Logger, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64
+    ) -> Self {
+        CalculationState {
+            d: distrib,
+            logger: logger,
+            coeff: coeff,
+            stokes: stokes,
+            s: s,
+            cos_observer_angle: theta.cos(),
+            sin_observer_angle: theta.sin(),
+            stokes_v_switch: StokesVSwitch::Inactive,
+        }
+    }
+
     pub fn compute(&mut self) -> f64 {
         const N_MAX: f64 = 30.;
 
-        trace!(self.logger, "beginning computation";
+        trace!(self.logger, "beginning Symphony computation";
                "distrib" => ?self.d,
                "coeff" => ?self.coeff,
                "stokes" => ?self.stokes,
@@ -81,7 +87,9 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         let mut gamma_workspace = gsl::IntegrationWorkspace::new(5000);
 
         for n in ((n_minus + 1.) as i64)..((n_minus + 1. + N_MAX) as i64) {
-            ans += self.gamma_integral(&mut gamma_workspace, n as f64);
+            let contrib = self.gamma_integral(&mut gamma_workspace, n as f64);
+            ans += contrib;
+            trace!(self.logger, "discrete N"; "n" => n, "contrib" => contrib, "ans" => ans);
         }
 
         // Now integrate the remaining n's, pretending that n can assume any
@@ -94,6 +102,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
 
         let n_start = (n_minus + 1. + N_MAX).floor();
         let n_integral_contrib = self.n_integration(n_start).unwrap_or(f64::NAN);
+        trace!(self.logger, "N integration 1"; "n_start" => n_start, "contrib" => n_integral_contrib);
 
         if !n_integral_contrib.is_nan() {
             ans += n_integral_contrib;
@@ -102,10 +111,13 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         if self.stokes == Stokes::V {
             self.stokes_v_switch = StokesVSwitch::NegativeLobe;
             let n_integral_contrib = self.n_integration(n_start).unwrap_or(f64::NAN);
+            trace!(self.logger, "N integration 2"; "n_start" => n_start, "contrib" => n_integral_contrib);
             if !n_integral_contrib.is_nan() {
                 ans += n_integral_contrib;
             }
         }
+
+        trace!(self.logger, "answer after Ns"; "ans" => ans);
 
         // Finally, apply the dimensional constants that don't vary inside any of the
         // integrals.
@@ -132,7 +144,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         //
         // Collecting the terms that aren't gamma or beta:
 
-        ans * match self.coeff {
+        let ans = ans * match self.coeff {
             Coefficient::Emission => {
                 (TWO_PI * ELECTRON_CHARGE).powi(2) /
                     (SPEED_LIGHT * self.cos_observer_angle.abs())
@@ -142,7 +154,10 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                     (2. * MASS_ELECTRON * SPEED_LIGHT * self.cos_observer_angle.abs())
             },
             Coefficient::Faraday => panic!("should never be reached"),
-        }
+        };
+
+        trace!(self.logger, "final dimensional Symphony result"; "ans" => ans);
+        ans
     }
 
     /// Compute the contributions to the integration from the region in the
@@ -160,6 +175,9 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         const DERIV_TOL: f64 = 1e-5;
         const TOLERANCE: f64 = 1e5;
 
+        // Note: if updating numerics, check whether `diagnostic_n_integral`
+        // needs to be updated to stay in sync.
+
         let mut n_workspace = gsl::IntegrationWorkspace::new(1000);
         let mut gamma_workspace = gsl::IntegrationWorkspace::new(5000);
 
@@ -169,6 +187,14 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             delta_n = 1.;
             incr_step_factor = 2.;
         }
+
+        trace!(self.logger, ". beginning N integration";
+               "n_start" => n_start,
+               "delta_n" => delta_n,
+               "incr_step_factor" => incr_step_factor,
+               "DERIV_TOL" => DERIV_TOL,
+               "TOLERANCE" => TOLERANCE
+        );
 
         while contrib.abs() >= (ans / TOLERANCE).abs() {
             // Evaluate the derivative of the gamma integral with regards to n
@@ -182,14 +208,17 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
 
             let deriv = gsl::deriv_central(|n| self.gamma_integral(&mut gamma_workspace, n), n_start, 1e-8)
                 .map(|r| r.value)?;
+            trace!(self.logger, ". derivative"; "n_start" => n_start, "deriv" => deriv);
 
             if deriv == 0. || (contrib != 0. && (deriv / contrib).abs() < DERIV_TOL) {
                 delta_n *= incr_step_factor;
+                trace!(self.logger, ". increasing delta_n"; "delta_n" => delta_n);
             }
 
             // Compute the next chunk: the integral over all gammas between
             // `n_start` and `n_start + delta_n`.
 
+            trace!(self.logger, ". integrating gamma_integral"; "lo" => n_start, "hi" => n_start + delta_n);
             contrib = n_workspace.qag(|n| self.gamma_integral(&mut gamma_workspace, n),
                                       n_start, n_start + delta_n)
                 .tolerance(0., 1e-3)
@@ -198,10 +227,23 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                 .map(|r| r.value)?;
 
             ans += contrib;
+            trace!(self.logger, ". N contribution"; "contrib" => contrib, "ans" => ans);
             n_start += delta_n;
         }
 
         Ok(ans)
+    }
+
+    /// An internal diagnostic for the N integral.
+    fn diagnostic_n_integral(&mut self, n_lo: f64, n_hi: f64) -> gsl::GslResult<f64> {
+        let mut n_workspace = gsl::IntegrationWorkspace::new(1000);
+        let mut gamma_workspace = gsl::IntegrationWorkspace::new(5000);
+
+        n_workspace.qag(|n| self.gamma_integral(&mut gamma_workspace, n), n_lo, n_hi)
+            .tolerance(0., 1e-3)
+            .rule(gsl::IntegrationRule::GaussKonrod31)
+            .compute()
+            .map(|r| r.value)
     }
 
     /// Integrate across different values of gamma at a fixed single value of
@@ -236,15 +278,40 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         let gamma_minus_high = gamma_peak - (gamma_peak - gamma_minus) / width;
         let gamma_plus_high = gamma_peak - (gamma_peak - gamma_plus) / width;
 
-        if self.stokes == Stokes::V && self.stokes_v_switch != StokesVSwitch::Inactive {
+        //trace!(self.logger, ". . gamma integral";
+        //       "n" => n,
+        //       "gamma_minus" => gamma_minus,
+        //       "gamma_plus" => gamma_plus,
+        //       "gamma_peak" => gamma_peak,
+        //       "gamma_minus_high" => gamma_minus_high,
+        //       "gamma_plus_high" => gamma_plus_high,
+        //       "width" => width,
+        //);
+
+        let (gamma0, gamma1) = if self.stokes == Stokes::V && self.stokes_v_switch != StokesVSwitch::Inactive {
             if self.stokes_v_switch == StokesVSwitch::PositiveLobe {
-                self._gamma_integral_inner(workspace, gamma_peak, gamma_plus_high, n)
+                (gamma_peak, gamma_plus_high)
             } else {
-                self._gamma_integral_inner(workspace, gamma_minus_high, gamma_peak, n)
+                (gamma_minus_high, gamma_peak)
             }
         } else {
-            self._gamma_integral_inner(workspace, gamma_minus_high, gamma_plus_high, n)
-        }
+            (gamma_minus_high, gamma_plus_high)
+        };
+
+        let contrib = self._gamma_integral_inner(workspace, gamma0, gamma1, n);
+        trace!(self.logger, ". . gamma integral result";
+               "n" => n,
+               "gamma0" => gamma0,
+               "gamma1" => gamma1,
+               "contrib" => contrib
+        );
+        contrib
+    }
+
+    /// An internal diagnostic version of `gamma_integral`.
+    fn diagnostic_gamma_integral(&mut self, n: f64) -> f64 {
+        let mut ws = gsl::IntegrationWorkspace::new(5000);
+        self.gamma_integral(&mut ws, n)
     }
 
     #[inline]
@@ -297,7 +364,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         // for explanations of the prefactors; almost all of the ones in the
         // papers can be pulled out of the integral.
 
-        gamma * gamma * pol_term * match self.coeff {
+        let f_term = match self.coeff {
             Coefficient::Emission => self.d.calc_f(gamma, cos_xi),
             Coefficient::Absorption => {
                 let (dfdg, dfdcx) = self.d.calc_f_derivatives(gamma, cos_xi);
@@ -305,6 +372,37 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                 dfdg + dfdcx_factor * dfdcx
             },
             Coefficient::Faraday => panic!("should never be reached"),
-        }
+        };
+
+        let r = gamma * gamma * pol_term * f_term;
+        //trace!(self.logger, "gamma_integrand";
+        //       "gamma" => gamma,
+        //       "n" => n,
+        //       "beta" => beta,
+        //       "cos_xi" => cos_xi,
+        //       "m" => m,
+        //       "z" => z,
+        //       "mj" => mj,
+        //       "njp" => njp,
+        //       "pol_term" => pol_term,
+        //       "f_term" => f_term,
+        //);
+        r
     }
+}
+
+
+// Diagnostic support
+
+pub fn diagnostic_n_integral<'a, D: DistributionFunction>(
+    distrib: &'a D, logger: &'a Logger, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64,
+    n_lo: f64, n_hi: f64
+) -> gsl::GslResult<f64> {
+    CalculationState::new(distrib, logger, coeff, stokes, s, theta).diagnostic_n_integral(n_lo, n_hi)
+}
+
+pub fn diagnostic_gamma_integral<'a, D: DistributionFunction>(
+    distrib: &'a D, logger: &'a Logger, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64, n: f64
+) -> f64 {
+    CalculationState::new(distrib, logger, coeff, stokes, s, theta).diagnostic_gamma_integral(n)
 }

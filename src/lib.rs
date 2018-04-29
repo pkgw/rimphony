@@ -245,3 +245,29 @@ impl<D: DistributionFunction> SynchrotronCalculator for FullSynchrotronCalculato
         }
     }
 }
+
+impl<D: DistributionFunction> FullSynchrotronCalculator<D> {
+    /// A diagnostic function for investigating the Symphony N integral.
+    ///
+    /// This function is only of interest if you're examining the internal
+    /// behavior of the code.
+    pub fn diagnostic_symphony_n_integral(
+        &self, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64, n_lo: f64, n_hi: f64
+    ) -> gsl::GslResult<f64> {
+        symphony::diagnostic_n_integral(
+            &self.distrib, &self.logger, coeff, stokes, s, theta, n_lo, n_hi
+        )
+    }
+
+    /// A diagnostic function for investigating the Symphony gamma integral.
+    ///
+    /// This function is only of interest if you're examining the internal
+    /// behavior of the code.
+    pub fn diagnostic_symphony_gamma_integral(
+        &self, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64, n: f64
+    ) -> f64 {
+        symphony::diagnostic_gamma_integral(
+            &self.distrib, &self.logger, coeff, stokes, s, theta, n
+        )
+    }
+}
