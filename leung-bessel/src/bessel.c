@@ -302,3 +302,94 @@ my_Bessel_dJ(const double n, const double x)
 
     return n * jn / x - jnp1;
 }
+
+
+/* ~Improved version
+ *
+ * TODO: The second Meissel approximation seems to have real problems for n >~
+ * 10^9. At least I see them where we try to overlap it with Debye.
+ */
+
+const double MINUS_ETA_A_INTERCEPT = 0.174857;
+const double MINUS_ETA_B_INTERCEPT = 0.295966;
+const double PLUS_ETA_A_INTERCEPT = 0.151550;
+const double PLUS_ETA_B_INTERCEPT = 0.438914;
+
+double
+pkgw_bessel_j(const double n, const double x)
+{
+    double logn;
+
+    if (!(n >= 0 && x >= 0))
+        /* The above definition catches NAN inputs */
+        return NAN;
+
+    if (n < N_JN) {
+        int n_int = (int) n;
+
+        if (n_int != n)
+            return NAN;
+
+        return gsl_sf_bessel_Jn(n_int, x);
+    }
+
+    if (x == n)
+        return BesselJ_Debye_Eps_Exp(n, x);
+
+    logn = log10(n);
+
+    if (x < n) {
+        const double eta = log10((n - x) / n); /* called "y" by Leung */
+        const double eta_thresh_lo = -0.6666666 * logn + MINUS_ETA_A_INTERCEPT;
+        const double eta_thresh_hi = -0.6666666 * logn + MINUS_ETA_B_INTERCEPT;
+
+        if (eta < eta_thresh_lo)
+            return BesselJ_Debye_Eps_Exp(n, x);
+
+        if (eta > eta_thresh_hi)
+            return BesselJ_Meissel_First(n, x);
+
+        {
+            const double debye = BesselJ_Debye_Eps_Exp(n, x);
+            const double meissel1 = BesselJ_Meissel_First(n, x);
+            const double pos = (eta - eta_thresh_lo) / (MINUS_ETA_B_INTERCEPT - MINUS_ETA_A_INTERCEPT);
+            return debye * (1 - pos) + meissel1 * pos;
+        }
+    } else {
+        const double eta = log10((x - n) / x);
+        const double eta_thresh_lo = -0.6666666 * logn + PLUS_ETA_A_INTERCEPT;
+        const double eta_thresh_hi = -0.6666666 * logn + PLUS_ETA_B_INTERCEPT;
+
+        if (eta < eta_thresh_lo)
+            return BesselJ_Debye_Eps_Exp(n, x);
+
+        if (eta > eta_thresh_hi)
+            return BesselJ_Meissel_Second(n, x);
+
+        {
+            const double debye = BesselJ_Debye_Eps_Exp(n, x);
+            const double meissel2 = BesselJ_Meissel_Second(n, x);
+            const double pos = (eta - eta_thresh_lo) / (PLUS_ETA_B_INTERCEPT - PLUS_ETA_A_INTERCEPT);
+            return debye * (1 - pos) + meissel2 * pos;
+        }
+    }
+}
+
+double
+pkgw_bessel_dj(const double n, const double x)
+{
+    const double jn = pkgw_bessel_j(n, x);
+    const double jnp1 = pkgw_bessel_j(n + 1, x);
+
+    if(x == 0.) {
+        if (n >= 2.)
+            return 0.;
+
+        if (n == 0.)
+            return -jnp1;
+
+        return n * jn / DBL_MIN - jnp1;
+    }
+
+    return n * jn / x - jnp1;
+}

@@ -33,9 +33,12 @@ not integral, NaN is returned.
 extern crate gsl_sys;
 extern crate libc;
 
+#[allow(unused)]
 extern {
     fn my_Bessel_J(n: libc::c_double, x: libc::c_double) -> libc::c_double;
     fn my_Bessel_dJ(n: libc::c_double, x: libc::c_double) -> libc::c_double;
+    fn pkgw_bessel_j(n: libc::c_double, x: libc::c_double) -> libc::c_double;
+    fn pkgw_bessel_dj(n: libc::c_double, x: libc::c_double) -> libc::c_double;
 }
 
 
@@ -51,7 +54,7 @@ extern {
 /// MathWorld](http://mathworld.wolfram.com/BesselFunctionoftheFirstKind.html).
 #[allow(non_snake_case)]
 pub fn Jn(n: f64, x: f64) -> f64 {
-    unsafe { my_Bessel_J(n, x) }
+    unsafe { pkgw_bessel_j(n, x) }
 }
 
 
@@ -68,7 +71,7 @@ pub fn Jn(n: f64, x: f64) -> f64 {
 /// MathWorld](http://mathworld.wolfram.com/BesselFunctionoftheFirstKind.html).
 #[allow(non_snake_case)]
 pub fn Jn_prime(n: f64, x: f64) -> f64 {
-    unsafe { my_Bessel_dJ(n, x) }
+    unsafe { pkgw_bessel_dj(n, x) }
 }
 
 #[cfg(test)]
