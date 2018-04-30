@@ -212,7 +212,19 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
 
             if deriv == 0. || (contrib != 0. && (deriv / contrib).abs() < DERIV_TOL) {
                 delta_n *= incr_step_factor;
-                trace!(self.logger, ". increasing delta_n"; "delta_n" => delta_n);
+                trace!(self.logger, ". increasing delta_n (deriv)"; "delta_n" => delta_n);
+            }
+
+            // This is another change from Symphony that vastly speeds up
+            // computations for small `s`. It is often the case that the small
+            // `delta_n` and `incr_step_factor` used above are far too
+            // conservative and make us do way too many integrals. Here we
+            // prevent `delta_n` from becoming small compared to `n_start`,
+            // which should always be safe.
+
+            if delta_n < n_start / incr_step_factor {
+                delta_n *= incr_step_factor;
+                trace!(self.logger, ". increasing delta_n (abs)"; "delta_n" => delta_n);
             }
 
             // Compute the next chunk: the integral over all gammas between
