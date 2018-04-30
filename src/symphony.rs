@@ -171,7 +171,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         let mut ans = 0_f64;
         let mut contrib = 0_f64;
         let mut delta_n = 1e5_f64;
-        let mut incr_step_factor = 100_f64;
+        let mut incr_step_factor = 10_f64;
         const DERIV_TOL: f64 = 1e-5;
         const TOLERANCE: f64 = 1e5;
 

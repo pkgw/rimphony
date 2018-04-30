@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2018 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 /// Crunch some numbers for in the powerlaw model.
@@ -6,9 +6,14 @@
 /// Due to the way it’s designed, the benchmarker runs each "iteration" at
 /// least 300 times, so this program can take a while to run. It adds up to
 /// about 40 minutes on my machine.
+///
+/// Benchmark results are occasionally logged in the Git history with commits
+/// whose messages contain the text `[benchdata]`.
 
 #[macro_use] extern crate bencher;
 extern crate rimphony;
+extern crate rimphony_test_support;
+extern crate slog;
 
 use rimphony::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI,
                Coefficient, Stokes, SynchrotronCalculator};
@@ -36,7 +41,7 @@ const LATIN_SQUARE: &[usize] = &[
     4, 2, 3, 0, 1,
 ];
 
-fn powerlaw_inner(coeff: Coefficient, stokes: Stokes, row_number: usize) {
+fn powerlaw_inner(log: slog::Logger, coeff: Coefficient, stokes: Stokes, row_number: usize) {
     // This function used to loop over every row in the Latin square, but that
     // would lead to the benchmark taking way too long to run.
 
@@ -51,56 +56,64 @@ fn powerlaw_inner(coeff: Coefficient, stokes: Stokes, row_number: usize) {
 
     rimphony::PowerLawDistribution::new(p)
         .gamma_limits(GAMMA_MIN, GAMMA_MAX, GAMMA_CUTOFF)
-        .full_calculation()
+        .full_calculation(log)
         .compute_cgs(coeff, stokes, nu, bfield, n_e, theta);
 }
 
 
 fn powerlaw_ji_0(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Emission, Stokes::I, 0);
+        powerlaw_inner(log.clone(), Coefficient::Emission, Stokes::I, 0);
     });
 }
 
 fn powerlaw_jq_0(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Emission, Stokes::Q, 0);
+        powerlaw_inner(log.clone(), Coefficient::Emission, Stokes::Q, 0);
     });
 }
 
 fn powerlaw_jv_0(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Emission, Stokes::V, 0);
+        powerlaw_inner(log.clone(), Coefficient::Emission, Stokes::V, 0);
     });
 }
 
 fn powerlaw_ai_0(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Absorption, Stokes::I, 0);
+        powerlaw_inner(log.clone(), Coefficient::Absorption, Stokes::I, 0);
     });
 }
 
 fn powerlaw_aq_0(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Absorption, Stokes::Q, 0);
+        powerlaw_inner(log.clone(), Coefficient::Absorption, Stokes::Q, 0);
     });
 }
 
 fn powerlaw_av_0(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Absorption, Stokes::V, 0);
+        powerlaw_inner(log.clone(), Coefficient::Absorption, Stokes::V, 0);
     });
 }
 
 fn powerlaw_fq_0(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Faraday, Stokes::Q, 0);
+        powerlaw_inner(log.clone(), Coefficient::Faraday, Stokes::Q, 0);
     });
 }
 
 fn powerlaw_fv_0(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Faraday, Stokes::V, 0);
+        powerlaw_inner(log.clone(), Coefficient::Faraday, Stokes::V, 0);
     });
 }
 
@@ -108,50 +121,58 @@ fn powerlaw_fv_0(b: &mut Bencher) {
 // A smattering of other parameter configurations.
 
 fn powerlaw_ji_1(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Emission, Stokes::I, 1);
+        powerlaw_inner(log.clone(), Coefficient::Emission, Stokes::I, 1);
     });
 }
 
 fn powerlaw_jq_2(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Emission, Stokes::Q, 2);
+        powerlaw_inner(log.clone(), Coefficient::Emission, Stokes::Q, 2);
     });
 }
 
 fn powerlaw_jv_3(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Emission, Stokes::V, 3);
+        powerlaw_inner(log.clone(), Coefficient::Emission, Stokes::V, 3);
     });
 }
 
 fn powerlaw_ai_4(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Absorption, Stokes::I, 4);
+        powerlaw_inner(log.clone(), Coefficient::Absorption, Stokes::I, 4);
     });
 }
 
 fn powerlaw_aq_1(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Absorption, Stokes::Q, 1);
+        powerlaw_inner(log.clone(), Coefficient::Absorption, Stokes::Q, 1);
     });
 }
 
 fn powerlaw_av_2(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Absorption, Stokes::V, 2);
+        powerlaw_inner(log.clone(), Coefficient::Absorption, Stokes::V, 2);
     });
 }
 
 fn powerlaw_fq_3(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Faraday, Stokes::Q, 3);
+        powerlaw_inner(log.clone(), Coefficient::Faraday, Stokes::Q, 3);
     });
 }
 
 fn powerlaw_fv_4(b: &mut Bencher) {
+    let log = rimphony_test_support::default_log();
     b.iter(|| {
-        powerlaw_inner(Coefficient::Faraday, Stokes::V, 4);
+        powerlaw_inner(log.clone(), Coefficient::Faraday, Stokes::V, 4);
     });
 }
 
