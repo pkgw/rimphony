@@ -413,3 +413,10 @@ pub fn diagnostic_gamma_integral<'a, D: DistributionFunction>(
 ) -> f64 {
     CalculationState::new(distrib, logger, coeff, stokes, s, theta).diagnostic_gamma_integral(n)
 }
+
+pub fn diagnostic_gamma_integrand<'a, D: DistributionFunction>(
+    distrib: &'a D, logger: &'a Logger, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64,
+    n: f64, gamma: f64
+) -> f64 {
+    CalculationState::new(distrib, logger, coeff, stokes, s, theta).gamma_integrand(gamma, n)
+}

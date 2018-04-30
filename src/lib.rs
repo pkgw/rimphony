@@ -270,4 +270,16 @@ impl<D: DistributionFunction> FullSynchrotronCalculator<D> {
             &self.distrib, &self.logger, coeff, stokes, s, theta, n
         )
     }
+
+    /// A diagnostic function for investigating the Symphony gamma integral.
+    ///
+    /// This function is only of interest if you're examining the internal
+    /// behavior of the code.
+    pub fn diagnostic_symphony_gamma_integrand(
+        &self, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64, n: f64, gamma: f64
+    ) -> f64 {
+        symphony::diagnostic_gamma_integrand(
+            &self.distrib, &self.logger, coeff, stokes, s, theta, n, gamma
+        )
+    }
 }
