@@ -310,7 +310,23 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             (gamma_minus_high, gamma_plus_high)
         };
 
-        let contrib = self._gamma_integral_inner(workspace, gamma0, gamma1, n);
+        // Formerly `gamma_integral` in Symphony's integrate.c
+        //
+        // In Symphony this function had code to avoid aborts if GSL failed to
+        // integrate if the harmonic number was high or the observer angle was
+        // low. We properly handle errors so we should never abort. Our policy
+        // then becomes more generous: we ignore failures and use zeros
+        // instead on *any* failure, not just ones in certain regions of
+        // parameter space. In Symphony, failures in those regions would lead
+        // to aborts.
+
+        let contrib = workspace.qag(|g| self.gamma_integrand(g, n), gamma0, gamma1)
+            .tolerance(0., 1e-3)
+            .rule(gsl::IntegrationRule::GaussKonrod31)
+            .compute()
+            .map(|r| r.value)
+            .unwrap_or(0.);
+
         trace!(self.logger, ". . gamma integral result";
                "n" => n,
                "gamma0" => gamma0,
@@ -324,27 +340,6 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
     fn diagnostic_gamma_integral(&mut self, n: f64) -> f64 {
         let mut ws = gsl::IntegrationWorkspace::new(5000);
         self.gamma_integral(&mut ws, n)
-    }
-
-    #[inline]
-    fn _gamma_integral_inner(&mut self, workspace: &mut gsl::IntegrationWorkspace,
-                             min: f64, max: f64, n: f64) -> f64 {
-        // Formerly `gamma_integral` in Symphony's integrate.c
-        //
-        // In Symphony this function had code to avoid aborts if GSL failed to
-        // integrate if the harmonic number was high or the observer angle was
-        // low. We properly handle errors so we should never abort. Our policy
-        // then becomes more generous: we ignore failures and use zeros
-        // instead on *any* failure, not just ones in certain regions of
-        // parameter space. In Symphony, failures in those regions would lead
-        // to aborts.
-
-        workspace.qag(|g| self.gamma_integrand(g, n), min, max)
-            .tolerance(0., 1e-3)
-            .rule(gsl::IntegrationRule::GaussKonrod31)
-            .compute()
-            .map(|r| r.value)
-            .unwrap_or(0.)
     }
 
     /// Calculate the contribution at specific values of *gamma* and *n*.
