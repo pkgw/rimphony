@@ -279,16 +279,16 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         const NU_HIGH: f64 = 3e8;
         const NU_LOW: f64 = 1e6;
 
-        let width = if self.s > NU_HIGH {
-            1000.
+        let rel_width = if self.s > NU_HIGH {
+            1e-3
         } else if self.s > NU_LOW {
-            10.
+            1e-1
         } else {
             1.
         };
 
-        let gamma_minus_high = gamma_peak - (gamma_peak - gamma_minus) / width;
-        let gamma_plus_high = gamma_peak - (gamma_peak - gamma_plus) / width;
+        let gamma_minus_high = gamma_peak - (gamma_peak - gamma_minus) * rel_width;
+        let gamma_plus_high = gamma_peak - (gamma_peak - gamma_plus) * rel_width;
 
         //trace!(self.logger, ". . gamma integral";
         //       "n" => n,
@@ -297,7 +297,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         //       "gamma_peak" => gamma_peak,
         //       "gamma_minus_high" => gamma_minus_high,
         //       "gamma_plus_high" => gamma_plus_high,
-        //       "width" => width,
+        //       "rel_width" => rel_width,
         //);
 
         let (gamma0, gamma1) = if self.stokes == Stokes::V && self.stokes_v_switch != StokesVSwitch::Inactive {
