@@ -278,17 +278,22 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                            ((n / self.s).powi(2) - self.sin_observer_angle.powi(2)).sqrt()
         ) / self.sin_observer_angle.powi(2);
 
-        let gamma_peak = 0.5 * (gamma_plus + gamma_minus);
+        let gamma_peak = 0.5 * (gamma_plus + gamma_minus); // = n / (s sin^2(th))
 
-        const NU_HIGH: f64 = 3e8;
-        const NU_LOW: f64 = 1e6;
+        // Symphony had a simple heuristic for setting (what we call)
+        // `rel_width` based on the value of `s`. But actually, width of the
+        // peak around `gamma_peak` depends most significantly on `n`. I have
+        // evaluated the integrand for various distribution functions and
+        // parameter combinations and found that the following formula gives a
+        // good value for `rel_width`. I have tried to make it conservatively
+        // wide, but I do find that we need to set `rel_width` to 1 for `s <
+        // 1e6` to reproduce Symphony's results. TODO: commit the supporting
+        // work used to determine this fitting formula.
 
-        let rel_width = if self.s > NU_HIGH {
-            1e-3
-        } else if self.s > NU_LOW {
-            1e-1
-        } else {
+        let rel_width = if self.s < 1e6 {
             1.
+        } else {
+            (-0.27 * n.ln() - 0.1).exp()
         };
 
         let gamma_minus_high = gamma_peak - (gamma_peak - gamma_minus) * rel_width;
