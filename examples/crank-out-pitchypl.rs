@@ -4,48 +4,15 @@
 /// Crank out coefficients for the "pitchy" power law distribution.
 
 extern crate clap;
-extern crate rand;
 extern crate rimphony;
 extern crate rimphony_test_support;
 
 use rimphony::{PitchyPowerLawDistribution, SynchrotronCalculator};
+use rimphony_test_support::Sampler;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::time::Instant;
-
-struct Sampler {
-    is_log: bool,
-    low: f64,
-    range: f64
-}
-
-impl Sampler {
-    fn new(is_log: bool, mut low: f64, mut high: f64) -> Self {
-        if low > high {
-            let tmp = high;
-            high = low;
-            low = tmp;
-        }
-
-        if is_log {
-            low = low.ln();
-            high = high.ln();
-        }
-
-        Sampler { is_log: is_log, low: low, range: high - low }
-    }
-
-    fn get(&self) -> f64 {
-        let n = self.low + rand::random::<f64>() * self.range;
-
-        if self.is_log {
-            n.exp()
-        } else {
-            n
-        }
-    }
-}
 
 
 fn main() {
