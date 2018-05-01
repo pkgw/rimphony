@@ -204,7 +204,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             // substantially if we change the units of the integrand. If the
             // only contributions come from very high n's, both `contrib` and
             // `deriv` are zero, in which case we need to increase our step
-            // size. We also set the derivative step size to be a fix fraction
+            // size. We also set the derivative step size to be a fixed fraction
             // of n_start, rather than unconditionally 1e-8, since for
             // challenging integrals (very small pitch angles) we can get n's
             // so big that `n_start + 1e-8 = n_start`.
