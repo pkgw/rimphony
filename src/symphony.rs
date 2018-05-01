@@ -364,11 +364,32 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         // convention". We do it right below.
 
         let beta = (1. - 1. / (gamma * gamma)).sqrt();
-        let cos_xi = (gamma - n / self.s) / (gamma * beta * self.cos_observer_angle);
+        let cos_xi = (self.s * gamma - n) / (self.s * gamma * beta * self.cos_observer_angle);
         let sin_xi = (1. - cos_xi * cos_xi).sqrt();
         let m = (self.cos_observer_angle - beta * cos_xi) / self.sin_observer_angle;
         let big_n = beta * sin_xi;
-        let z = self.s * gamma * beta * self.sin_observer_angle * sin_xi;
+
+        // At very low pitch angles and high `s` values, we have to evaluate
+        // this integrand at very large `gamma` and `n` (e.g.: theta ~ 0.005,
+        // s ~ 1e7, gamma ~ 1e9, n ~ 1e12). The above expression for `sin_xi`
+        // loses much of the precision in the input parameter `gamma`, and
+        // this noise propagates into `z` and the `n - z` difference that
+        // matters in the evaluation of the Bessel functions. The the upshot
+        // is that the integrand starts jittering at the ~0.1% level with
+        // small changes in `gamma`, which can cause the integrator to freak
+        // out and give up.
+        //
+        // In the computation of `z`, the key value that must be computed
+        // carefully is the combination `gamma sin(xi)`. The following
+        // equation stabilizes the numerics such that `z` varies smoothly with
+        // `gamma` in these challenging situations.
+
+        let beta2_costh2 = (beta * self.cos_observer_angle).powi(2);
+        let s_on_r = 2. * n / (self.s * (beta2_costh2 - 1.));
+        let r = 1. - 1. / beta2_costh2;
+        let gamma_sin_xi = (r * (gamma * (gamma + s_on_r)) - (n * n / (self.s * self.s * beta2_costh2))).sqrt();
+        let z = self.s * beta * self.sin_observer_angle * gamma_sin_xi;
+
         let mj = m * leung_bessel::Jn(n, z);
         let njp = big_n * leung_bessel::Jn_prime(n, z);
 
