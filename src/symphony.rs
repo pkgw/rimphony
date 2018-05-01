@@ -243,7 +243,10 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                 .map(|r| r.value)?;
 
             ans += contrib;
-            trace!(self.logger, ". N contribution"; "contrib" => contrib, "ans" => ans);
+            trace!(self.logger, ". N contribution";
+                   "contrib" => format!("{:.16e}", contrib),
+                   "ans" => format!("{:.16e}", ans)
+            );
             n_start += delta_n;
         }
 
@@ -392,16 +395,16 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
 
         let r = gamma * gamma * pol_term * f_term;
         //trace!(self.logger, "gamma_integrand";
-        //       "gamma" => gamma,
-        //       "n" => n,
-        //       "beta" => beta,
-        //       "cos_xi" => cos_xi,
-        //       "m" => m,
-        //       "z" => z,
-        //       "mj" => mj,
-        //       "njp" => njp,
-        //       "pol_term" => pol_term,
-        //       "f_term" => f_term,
+        //       "gamma" => format!("{:.16e}", gamma),
+        //       "n" => format!("{:.16e}", n),
+        //       "beta" => format!("{:.16e}", beta),
+        //       "cos_xi" => format!("{:.16e}", cos_xi),
+        //       "m" => format!("{:.16e}", m),
+        //       "z" => format!("{:.16e}", z),
+        //       "mj" => format!("{:.16e}", mj),
+        //       "njp" => format!("{:.16e}", njp),
+        //       "pol_term" => format!("{:.16e}", pol_term),
+        //       "f_term" => format!("{:.16e}", f_term),
         //);
         r
     }
