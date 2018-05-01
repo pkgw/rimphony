@@ -54,14 +54,22 @@ fn main() {
              .help("The maximum 'kappa' value to generate")
              .required(true)
              .index(7))
+        .arg(clap::Arg::with_name("WIDTH_MIN")
+             .help("The minimum 'width' value to generate")
+             .required(true)
+             .index(8))
+        .arg(clap::Arg::with_name("WIDTH_MAX")
+             .help("The maximum 'width' value to generate")
+             .required(true)
+             .index(9))
         .arg(clap::Arg::with_name("K_MIN")
              .help("The minimum 'k' value to generate")
              .required(true)
-             .index(8))
+             .index(10))
         .arg(clap::Arg::with_name("K_MAX")
              .help("The maximum 'k' value to generate")
              .required(true)
-             .index(9))
+             .index(11))
         .get_matches();
 
     let outfile = PathBuf::from(matches.value_of_os("OUTFILE").unwrap());
@@ -80,6 +88,10 @@ fn main() {
         false,
         matches.value_of("KAPPA_MIN").unwrap().parse::<f64>().unwrap(),
         matches.value_of("KAPPA_MAX").unwrap().parse::<f64>().unwrap());
+    let width_sampler = Sampler::new(
+        false,
+        matches.value_of("WIDTH_MIN").unwrap().parse::<f64>().unwrap(),
+        matches.value_of("WIDTH_MAX").unwrap().parse::<f64>().unwrap());
     let k_sampler = Sampler::new(
         false,
         matches.value_of("K_MIN").unwrap().parse::<f64>().unwrap(),
@@ -92,25 +104,25 @@ fn main() {
         .open(outfile)
         .unwrap();
 
-    writeln!(file, "# s(log) theta(lin) kappa(lin) k(lin) !time_ms").expect("write error");
+    writeln!(file, "# s(log) theta(lin) kappa(lin) width(lin) k(lin) !time_ms").expect("write error");
 
     loop {
         let s = s_sampler.get();
         let theta = theta_sampler.get();
         let kappa = kappa_sampler.get();
+        let width = width_sampler.get();
         let k = k_sampler.get();
 
-        const WIDTH: f64 = 3.;
         const GAMMA_CUTOFF: f64 = 1e10;
 
         // Log the parameters so we can reconstruct cases that fail.
-        write!(file, "{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}",
-               s, theta, kappa, k
+        write!(file, "{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}\t{:.16e}",
+               s, theta, kappa, width, k
         ).expect("write error");
         file.flush().expect("flush error");
 
         let t0 = Instant::now();
-        let vals = PitchyKappaDistribution::new(kappa, WIDTH, k)
+        let vals = PitchyKappaDistribution::new(kappa, width, k)
             .gamma_cutoff(GAMMA_CUTOFF)
             .full_calculation(log.clone())
             .compute_all_dimensionless(s, theta);
