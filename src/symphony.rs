@@ -23,7 +23,6 @@ use super::{ELECTRON_CHARGE, MASS_ELECTRON, SPEED_LIGHT, TWO_PI};
 
 #[derive(Copy,Clone,Debug,Eq,Hash,PartialEq)]
 enum StokesVSwitch {
-    Inactive,
     PositiveLobe,
     NegativeLobe,
 }
@@ -60,7 +59,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             s: s,
             cos_observer_angle: theta.cos(),
             sin_observer_angle: theta.sin(),
-            stokes_v_switch: StokesVSwitch::Inactive,
+            stokes_v_switch: StokesVSwitch::NegativeLobe,
         }
     }
 
@@ -79,17 +78,33 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
 
         let mut ans = 0_f64;
 
-        // Calculate the contributions from the first 30 n's discretely.
+        // Calculate the contributions from the first 30 n's discretely. For
+        // Stokes V, Symphony doesn't split these integrations into positive
+        // and negative lobes, but for a power law with p = 2.5, theta =
+        // 1.5707, s = 10., n = 31., I find that the GSL integration errors
+        // out with a roundoff problem even though the integrand is perfectly
+        // behaved. As far as I can tell, the integrator doesn't just have
+        // precision problems but actively fails because the integral is very
+        // close to zero; this surprises me, but it's my best interpretation
+        // of what's going on. But anyway, splitting the integral avoids the
+        // problem.
 
         let n_minus = self.s * self.sin_observer_angle.abs();
 
-        self.stokes_v_switch = StokesVSwitch::Inactive;
         let mut gamma_workspace = gsl::IntegrationWorkspace::new(5000);
 
         for n in ((n_minus + 1.) as i64)..((n_minus + 1. + N_MAX) as i64) {
+            self.stokes_v_switch = StokesVSwitch::PositiveLobe;
             let contrib = self.gamma_integral(&mut gamma_workspace, n as f64);
             ans += contrib;
-            trace!(self.logger, "discrete N"; "n" => n, "contrib" => contrib, "ans" => ans);
+            trace!(self.logger, "discrete N (1)"; "n" => n, "contrib" => contrib, "ans" => ans);
+
+            if self.stokes == Stokes::V {
+                self.stokes_v_switch = StokesVSwitch::NegativeLobe;
+                let contrib = self.gamma_integral(&mut gamma_workspace, n as f64);
+                ans += contrib;
+                trace!(self.logger, "discrete N (2)"; "n" => n, "contrib" => contrib, "ans" => ans);
+            }
         }
 
         // Now integrate the remaining n's, pretending that n can assume any
@@ -98,9 +113,9 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         // (see n_integration). We're a bit sloppy about the integration so if
         // it results in a NAN error, just ignore it.
 
-        self.stokes_v_switch = StokesVSwitch::PositiveLobe;
-
         let n_start = (n_minus + 1. + N_MAX).floor();
+
+        self.stokes_v_switch = StokesVSwitch::PositiveLobe;
         let n_integral_contrib = self.n_integration(n_start).unwrap_or(f64::NAN);
         trace!(self.logger, "N integration 1"; "n_start" => n_start, "contrib" => n_integral_contrib);
 
@@ -312,11 +327,10 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         //       "rel_width" => rel_width,
         //);
 
-        let (gamma0, gamma1) = if self.stokes == Stokes::V && self.stokes_v_switch != StokesVSwitch::Inactive {
-            if self.stokes_v_switch == StokesVSwitch::PositiveLobe {
-                (gamma_peak, gamma_plus_high)
-            } else {
-                (gamma_minus_high, gamma_peak)
+        let (gamma0, gamma1) = if self.stokes == Stokes::V {
+            match self.stokes_v_switch {
+                StokesVSwitch::PositiveLobe => (gamma_peak, gamma_plus_high),
+                StokesVSwitch::NegativeLobe => (gamma_minus_high, gamma_peak),
             }
         } else {
             (gamma_minus_high, gamma_plus_high)
