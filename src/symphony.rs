@@ -383,11 +383,19 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         // carefully is the combination `gamma sin(xi)`. The following
         // equation stabilizes the numerics such that `z` varies smoothly with
         // `gamma` in these challenging situations.
+        //
+        // On the other hand, if gamma ~= 1., the fancy math breaks. In that case,
+        // the naive computation works fine.
 
-        let beta2_costh2 = (beta * self.cos_observer_angle).powi(2);
-        let s_on_r = 2. * n / (self.s * (beta2_costh2 - 1.));
-        let r = 1. - 1. / beta2_costh2;
-        let gamma_sin_xi = (r * (gamma * (gamma + s_on_r)) - (n * n / (self.s * self.s * beta2_costh2))).sqrt();
+        let gamma_sin_xi = if beta < 0.1 {
+            gamma * sin_xi
+        } else {
+            let beta2_costh2 = (beta * self.cos_observer_angle).powi(2);
+            let s_on_r = 2. * n / (self.s * (beta2_costh2 - 1.));
+            let r = 1. - 1. / beta2_costh2;
+            (r * (gamma * (gamma + s_on_r)) - (n * n / (self.s * self.s * beta2_costh2))).sqrt()
+        };
+
         let z = self.s * beta * self.sin_observer_angle * gamma_sin_xi;
 
         let mj = m * leung_bessel::Jn(n, z);
