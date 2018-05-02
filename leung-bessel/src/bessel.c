@@ -375,21 +375,31 @@ pkgw_bessel_j(const double n, const double x)
     }
 }
 
+
 double
 pkgw_bessel_dj(const double n, const double x)
 {
-    const double jn = pkgw_bessel_j(n, x);
-    const double jnp1 = pkgw_bessel_j(n + 1, x);
+    if (n >= 1e15) {
+        /* When `n` is this big, we can have `n + 1 = n`, which breaks our
+         * recurrence relation! I investigated a few workarounds (e.g. using
+         * `gsl_deriv_central` but nothing seemed satisfactory. For now, just
+         * give up.
+         */
+        return NAN;
+    } else {
+        const double jn = pkgw_bessel_j(n, x);
+        const double jnp1 = pkgw_bessel_j(n + 1, x);
 
-    if(x == 0.) {
-        if (n >= 2.)
-            return 0.;
+        if (x == 0.) {
+            if (n >= 2.)
+                return 0.;
 
-        if (n == 0.)
-            return -jnp1;
+            if (n == 0.)
+                return -jnp1;
 
-        return n * jn / DBL_MIN - jnp1;
+            return n * jn / DBL_MIN - jnp1;
+        }
+
+        return n * jn / x - jnp1;
     }
-
-    return n * jn / x - jnp1;
 }
