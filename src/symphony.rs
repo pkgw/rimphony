@@ -107,6 +107,10 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             }
         }
 
+        if !ans.is_finite() {
+            return f64::NAN;
+        }
+
         // Now integrate the remaining n's, pretending that n can assume any
         // real value. Stokes V is hard to resolve, so if we're computing it,
         // we split the integrals into two lobes and add the results together
@@ -117,22 +121,25 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
 
         self.stokes_v_switch = StokesVSwitch::PositiveLobe;
         let n_integral_contrib = self.n_integration(n_start).unwrap_or(f64::NAN);
+        ans += n_integral_contrib;
         trace!(self.logger, "N integration 1"; "n_start" => n_start, "contrib" => n_integral_contrib);
 
-        if !n_integral_contrib.is_nan() {
-            ans += n_integral_contrib;
+        if !ans.is_finite() {
+            return f64::NAN;
         }
 
         if self.stokes == Stokes::V {
             self.stokes_v_switch = StokesVSwitch::NegativeLobe;
             let n_integral_contrib = self.n_integration(n_start).unwrap_or(f64::NAN);
+            ans += n_integral_contrib;
             trace!(self.logger, "N integration 2"; "n_start" => n_start, "contrib" => n_integral_contrib);
-            if !n_integral_contrib.is_nan() {
-                ans += n_integral_contrib;
-            }
         }
 
         trace!(self.logger, "answer after Ns"; "ans" => ans);
+
+        if !ans.is_finite() {
+            return f64::NAN;
+        }
 
         // Finally, apply the dimensional constants that don't vary inside any of the
         // integrals.
@@ -366,7 +373,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             .rule(gsl::IntegrationRule::GaussKonrod31)
             .compute()
             .map(|r| r.value)
-            .unwrap_or(0.);
+            .unwrap_or(f64::NAN);
 
         trace!(self.logger, ". . gamma integral result";
                "n" => n,
