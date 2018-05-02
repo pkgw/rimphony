@@ -263,6 +263,21 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
                    "ans" => format!("{:.16e}", ans)
             );
             n_start += delta_n;
+
+            // Our code for computing the derivative of the Bessel function
+            // breaks for n >~ 1e15: see `bessel.c` in `leung-bessel/`.
+            // Therefore, if n is getting close to that level, we don't want
+            // our n integrals to get too wide: if we can't return a good
+            // answer without evaluating the integrand for huge n, so be it;
+            // but an overly wide `delta_n` might cause the GSL integrator to
+            // bail on a NaN that doesn't actually affect our computation. By
+            // changing `incr_step_factor` here, we prevent `delta_n` from
+            // getting really big, increasing our chances of deciding that
+            // we've converged before hitting a Bessel problem.
+
+            if n_start > 1e13 {
+                incr_step_factor = 1.;
+            }
         }
 
         Ok(ans)
