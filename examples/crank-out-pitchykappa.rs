@@ -2,13 +2,6 @@
 // Licensed under the GPL version 3.
 
 /// Crank out coefficients for the "pitchy" kappa distribution.
-///
-/// We fix the width parameter to 3. This is an arbitrary hack for my
-/// exploratory work to reduce the number of model parameters that I need to
-/// worry about. Once I get the SDE formalism for magnetospheric particle
-/// distributions working well, I should run some fits on the resulting
-/// distributions and see whether a free width parameter is needed or not (or
-/// indeed if the pitchy kappa distribution is a good approximation at all).
 
 extern crate clap;
 extern crate rimphony;
@@ -89,7 +82,7 @@ fn main() {
         matches.value_of("KAPPA_MIN").unwrap().parse::<f64>().unwrap(),
         matches.value_of("KAPPA_MAX").unwrap().parse::<f64>().unwrap());
     let width_sampler = Sampler::new(
-        false,
+        true,
         matches.value_of("WIDTH_MIN").unwrap().parse::<f64>().unwrap(),
         matches.value_of("WIDTH_MAX").unwrap().parse::<f64>().unwrap());
     let k_sampler = Sampler::new(
@@ -104,7 +97,7 @@ fn main() {
         .open(outfile)
         .unwrap();
 
-    writeln!(file, "# s(log) theta(lin) kappa(lin) width(lin) k(lin) !time_ms").expect("write error");
+    writeln!(file, "# s(log) theta(lin) kappa(lin) width(log) k(lin) !time_ms").expect("write error");
 
     loop {
         let s = s_sampler.get();
