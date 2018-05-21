@@ -84,7 +84,19 @@ fn main() {
         .open(outfile)
         .unwrap();
 
-    writeln!(file, "# s(log) theta(lin) p(lin) k(lin) !time_ms").expect("write error");
+    writeln!(file, "s(log)\t\
+                    theta(lin)\t\
+                    p(lin)\t\
+                    k(lin)\t\
+                    time_ms(meta)\t\
+                    j_I(res)\t\
+                    alpha_I(res)\t\
+                    j_Q(res)\t\
+                    alpha_Q(res)\t\
+                    j_V(res)\t\
+                    alpha_V(res)\t\
+                    rho_Q(res)\t\
+                    rho_V(res)").expect("write error");
 
     loop {
         let s = s_sampler.get();
