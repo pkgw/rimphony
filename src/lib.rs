@@ -282,4 +282,18 @@ impl<D: DistributionFunction> FullSynchrotronCalculator<D> {
             &self.distrib, &self.logger, coeff, stokes, s, theta, n, gamma
         )
     }
+
+    /// A diagnostic function for investigating the Symphony double integral.
+    ///
+    /// This reverses the order of the Symphony integral, and returns the
+    /// contribution across all relevant *n* at fixed gamma. In the Symphony
+    /// approach, the final coefficient is integrated across all relevant
+    /// gamma at fixed *n*.
+    pub fn diagnostic_symphony_gamma_contribution(
+        &self, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64, gamma: f64
+    ) -> f64 {
+        symphony::diagnostic_gamma_contribution(
+            &self.distrib, &self.logger, coeff, stokes, s, theta, gamma
+        )
+    }
 }

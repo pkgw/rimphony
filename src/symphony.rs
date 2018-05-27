@@ -473,6 +473,94 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         //);
         r
     }
+
+    /// Another diagnostic that slices the 2D integral the other way.
+    ///
+    /// At fixed gamma, sums over the relevant *n* values to compute the
+    /// contribution from electrons at a particular energy. If one were to
+    /// hypothetically integrate over gammas here, the result would be
+    /// unlikely to agree with the standard computation due to the
+    /// approximations involved.
+    ///
+    /// The numerics here are not well-exercised and so are likely to be much
+    /// more prone to failure than the main computation.
+    pub fn diagnostic_gamma_contribution(&mut self, gamma: f64) -> f64 {
+        // Calculate the range of n's that contribute. This is an algebraic
+        // rearrangement of the gamma_{plus,minus} computation in
+        // `gamma_integral`. The computation is not symmetrical in n the way
+        // that it is in gamma, though, so n_peak != 0.5 * (n_plus + n_minus).
+
+        let delta = self.cos_observer_angle.abs() * (gamma * gamma - 1.).sqrt();
+        //let n_peak = (self.s * self.sin_observer_angle.powi(2) * gamma + 0.5) as i64;
+        let n_minus = (self.s * (gamma - delta) + 1.) as i64;
+        let n_plus = (self.s * (gamma + delta)) as i64;
+
+        trace!(self.logger, "gamma diagnostic bounds";
+               "gamma" => gamma, "n_minus" => n_minus, "n_plus" => n_plus);
+
+        // If the number of discrete n's is not large, just do the whole
+        // calculation discretely. Otherwise, sort of emulate compute(): do
+        // the 30 smallest n's discretely and integrate the rest.
+
+        let mut ans = 0_f64;
+        const FULLY_DISCRETE_THRESHOLD: i64 = 1000;
+        const N_DISCRETE: i64 = 30;
+
+        if n_plus - n_minus < FULLY_DISCRETE_THRESHOLD {
+            for n in n_minus..(n_plus + 1) {
+                let contrib = self.gamma_integrand(gamma, n as f64);
+                trace!(self.logger, "gamma diagnostic fully discrete";
+                       "gamma" => gamma, "n" => n, "contrib" => contrib, "ans" => ans);
+                ans += contrib;
+            }
+        } else {
+            for n in n_minus..(n_minus + N_DISCRETE + 1) {
+                let contrib = self.gamma_integrand(gamma, n as f64);
+                trace!(self.logger, "gamma diagnostic partial discrete";
+                       "gamma" => gamma, "n" => n, "contrib" => contrib, "ans" => ans);
+                ans += contrib;
+            }
+
+            // No fancy dynamic monitoring of the integral ... just do it.
+
+            let mut ws = gsl::IntegrationWorkspace::new(5000);
+
+            trace!(self.logger, "gamma diagnostic integrating";
+                   "lo" => n_minus + N_DISCRETE + 1, "hi" => n_plus);
+
+            let contrib = ws.qag(|n| self.gamma_integrand(gamma, n),
+                                 (n_minus + N_DISCRETE + 1) as f64, n_plus as f64)
+                .tolerance(0., 1e-3)
+                .rule(gsl::IntegrationRule::GaussKonrod31)
+                .compute()
+                .map(|r| r.value)
+                .unwrap_or(f64::NAN);
+
+            trace!(self.logger, "gamma diagnostic integral contribution"; "contrib" => contrib);
+            ans += contrib;
+        }
+
+        if !ans.is_finite() {
+            return f64::NAN;
+        }
+
+        // Finally, apply the dimensional constants.
+
+        let ans = ans * match self.coeff {
+            Coefficient::Emission => {
+                (TWO_PI * ELECTRON_CHARGE).powi(2) /
+                    (SPEED_LIGHT * self.cos_observer_angle.abs())
+            },
+            Coefficient::Absorption => {
+                -1. * (TWO_PI * ELECTRON_CHARGE).powi(2) /
+                    (2. * MASS_ELECTRON * SPEED_LIGHT * self.cos_observer_angle.abs())
+            },
+            Coefficient::Faraday => panic!("should never be reached"),
+        };
+
+        trace!(self.logger, "final dimensional gamma diagnostic result"; "ans" => ans);
+        ans
+    }
 }
 
 
@@ -496,4 +584,11 @@ pub fn diagnostic_gamma_integrand<'a, D: DistributionFunction>(
     n: f64, gamma: f64
 ) -> f64 {
     CalculationState::new(distrib, logger, coeff, stokes, s, theta).gamma_integrand(gamma, n)
+}
+
+pub fn diagnostic_gamma_contribution<'a, D: DistributionFunction>(
+    distrib: &'a D, logger: &'a Logger, coeff: Coefficient, stokes: Stokes, s: f64, theta: f64,
+    gamma: f64
+) -> f64 {
+    CalculationState::new(distrib, logger, coeff, stokes, s, theta).diagnostic_gamma_contribution(gamma)
 }
