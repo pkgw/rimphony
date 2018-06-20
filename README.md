@@ -1,23 +1,36 @@
 # rimphony
 
-This is a reimplementation of the
-[Symphony](https://github.com/AFD-Illinois/symphony) synchrotron coefficient
-code in the [Rust](https://rust-lang.org/) language. It adds on new routines
-to calculate Faraday rotation and conversion coefficients using the formalism
-developed by [Heyvaerts et al (2013;
-DOI:10.1093/mnras/stt135)](https://dx.doi.org/10.1093/mnras/stt135).
+Rimphony is a tool to calculate the eight coefficients needed to do numerical
+radiative transfer of polarized synchrotron emission. Unlike some comparable
+tools, it supports particle distributions that are anisotropic in pitch angle,
+and can calculate Faraday rotation and conversion coefficients. And, of
+course, it’s fully open source!
 
-Testing indicates that the code works well but it is still in development. You
-are encouraged to use Symphony if possible, citing
+Rimphony began life as an experimental reimplementation of the
+[Symphony](https://github.com/AFD-Illinois/symphony) synchrotron coefficient
+code in the [Rust](https://rust-lang.org/) language. Symphony comes out of
+Charles Gammie's group and is primarily the work of Alex Pandya. Its
+algorithms are described in
 [Pandya et al (2016)](https://dx.doi.org/10.3847/0004-637X/822/1/34) and
 [Leung et al (2011)](https://dx.doi.org/10.1088/0004-637X/737/1/21).
 
-I ([PKGW](https://newton.cx/~peter/)) wrote this version to help me understand
-Symphony better, to try out Rust as a language for scientific programming, and
-because I thought that writing the program in Rust would make it a bit easier
-to experiment with some new features, such as pitch-angle dependences in the
-electron distribution functions and calculation of Faraday coefficients. I
-feel that that is indeed the case.
+Rimphony has adapted the computational framework of Symphony and adds new
+routines to calculate Faraday rotation and conversion coefficients using the
+formalism developed by
+[Heyvaerts et al (2013; DOI:10.1093/mnras/stt135)](https://dx.doi.org/10.1093/mnras/stt135).
+Some of the Symphony implementation details have also been altered to increase
+speed and reliability in challenging corners of parameter space. While
+rimphony is not yet described in a refereed publication, based on the results
+of its built-in validation test suite and benchmarking, I
+([PKGW](https://newton.cx/~peter/)) feel comfortable recommending it for use
+in research projects.
+
+As a side note, my overall takeaway is that Rust is an *excellent* language
+for this kind of project. In my opinion, the code of Rimphony is substantially
+more readable and extensible than that of Symphony, and the infrastructure of
+the Rust language make compilation, testing, benchmarking, documentation, and
+distribution all straightforward.
+
 
 ## Compiling and running it
 

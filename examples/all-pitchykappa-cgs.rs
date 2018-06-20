@@ -52,7 +52,7 @@ fn main() {
     let width = matches.value_of("WIDTH").unwrap().parse::<f64>().unwrap();
     let k = matches.value_of("K").unwrap().parse::<f64>().unwrap();
 
-    const GAMMA_CUTOFF: f64 = 1e10;
+    const GAMMA_CUTOFF: f64 = 100.;
 
     let calc = rimphony::PitchyKappaDistribution::new(kappa, width, k)
         .gamma_cutoff(GAMMA_CUTOFF)
