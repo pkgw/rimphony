@@ -107,6 +107,11 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
             }
         }
 
+        // Symphony has a policy of replaing NaN's with zeros and hoping for
+        // the best. I've tightened up some of the numerics such that in my
+        // experience, NANs seem to always indicate that something has
+        // genuinely failed. Therefore if any NaNs show up, we give up.
+
         if !ans.is_finite() {
             return f64::NAN;
         }
@@ -114,8 +119,7 @@ impl<'a, D: 'a + DistributionFunction> CalculationState<'a, D> {
         // Now integrate the remaining n's, pretending that n can assume any
         // real value. Stokes V is hard to resolve, so if we're computing it,
         // we split the integrals into two lobes and add the results together
-        // (see n_integration). We're a bit sloppy about the integration so if
-        // it results in a NAN error, just ignore it.
+        // (see n_integration).
 
         let n_start = (n_minus + 1. + N_MAX).floor();
 
