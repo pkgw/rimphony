@@ -1,0 +1,28 @@
+# Copyright 2018 Peter K. G. Williams and collaborators
+# Licensed under the GPL version 3
+
+language: rust
+
+cache: cargo
+
+matrix:
+  include:
+    - os: linux
+      sudo: required
+      dist: xenial
+      rust: stable
+    - os: linux
+      sudo: required
+      dist: xenial
+      rust: beta
+    - os: linux
+      sudo: required
+      dist: xenial
+      rust: nightly
+  allow_failures:
+    - rust: nightly
+
+script:
+  - |
+    cargo build --verbose &&
+    cargo test
