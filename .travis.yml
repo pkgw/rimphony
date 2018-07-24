@@ -22,6 +22,11 @@ matrix:
   allow_failures:
     - rust: nightly
 
+addons:
+  apt:
+    packages:
+      - libgsl-dev
+
 script:
   - |
     cargo build --verbose &&
