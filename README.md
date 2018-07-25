@@ -68,7 +68,8 @@ API calls, and did something with the results. For instance, the example
 program `crank-out-pitchypl` computes and prints coefficient values for random
 input parameters. I use these as training data for a neural network that can
 quickly compute approximate synchrotron coefficients for arbitrary input
-parameters.
+parameters — the [neurosynchro](https://github.com/pkgw/neurosynchro/)
+project.
 
 
 ## Structure
