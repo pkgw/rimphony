@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2019 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 extern crate bindgen;
@@ -8,18 +8,21 @@ use std::env;
 use std::path::PathBuf;
 
 fn main() {
-    let gsl = pkg_config::Config::new().atleast_version("1.0").probe("gsl").unwrap();
+    let gsl = pkg_config::Config::new()
+        .atleast_version("1.0")
+        .probe("gsl")
+        .unwrap();
 
-    let mut builder = bindgen::Builder::default()
-        .header("src/wrapper.h");
+    let mut builder = bindgen::Builder::default().header("src/wrapper.h");
 
     for ref path in &gsl.include_paths {
         builder = builder.clang_arg(format!("-I{}", path.display()));
     }
-    
+
     let bindings = builder
-        .whitelisted_type("gsl_.*")
-        .whitelisted_function("gsl_.*")
+        .whitelist_type("gsl_.*")
+        .whitelist_function("gsl_.*")
+        .blacklist_function("gsl_coerce_long_double") // uses u128 which is not stable
         .generate()
         .expect("Unable to generate bindings");
 
