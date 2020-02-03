@@ -113,10 +113,11 @@ fn main() {
 
     let log = rimphony_test_support::default_log();
 
-    let gen: Box<Iterator<Item = Record>> = Box::new(match matches.value_of("DEMONAME").unwrap() {
-        "almostuniform1" => AlmostUniform1Demo::new(log),
-        _ => unreachable!(),
-    });
+    let gen: Box<dyn Iterator<Item = Record>> =
+        Box::new(match matches.value_of("DEMONAME").unwrap() {
+            "almostuniform1" => AlmostUniform1Demo::new(log),
+            _ => unreachable!(),
+        });
 
     println!(
         "s(lin)\t\
