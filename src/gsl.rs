@@ -1,8 +1,7 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2020 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 /// Bindings just to the portions of GSL that we need.
-
 use gsl_sys;
 use std::error::Error;
 use std::f64;
@@ -11,8 +10,7 @@ use std::fmt;
 use std::mem;
 use std::os::raw;
 
-
-#[derive(Clone,Debug,Eq,Hash,PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct GslError {
     code: raw::c_int,
     message: String,
@@ -29,7 +27,7 @@ impl Error for GslError {
         self.message.as_ref()
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 }
@@ -43,13 +41,14 @@ impl GslError {
             Err(_) => format!("GSL error {} (could not decode explanation)", code),
         };
 
-        GslError { code: code, message: msg }
+        GslError {
+            code: code,
+            message: msg,
+        }
     }
 }
 
-
 pub type GslResult<T> = Result<T, GslError>;
-
 
 #[derive(Debug)]
 pub struct IntegrationWorkspace {
@@ -59,7 +58,7 @@ pub struct IntegrationWorkspace {
 impl IntegrationWorkspace {
     pub fn new(n: usize) -> Self {
         IntegrationWorkspace {
-            handle: unsafe { gsl_sys::gsl_integration_workspace_alloc(n) },
+            handle: unsafe { gsl_sys::gsl_integration_workspace_alloc(n as u64) },
         }
     }
 }
@@ -70,16 +69,14 @@ impl Drop for IntegrationWorkspace {
     }
 }
 
-
-#[derive(Clone,Copy,Debug,PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct IntegrationResult {
     pub value: f64,
-    pub abserr: f64
+    pub abserr: f64,
 }
 
-
 // This enum is unnamed in GSL so I'm not sure how to get bindgen to pick it up.
-#[derive(Clone,Copy,Debug,Eq,PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[allow(dead_code)]
 pub enum IntegrationRule {
     GaussKonrod15 = 1,
@@ -90,16 +87,17 @@ pub enum IntegrationRule {
     GaussKonrod61 = 6,
 }
 
-
-#[derive(Clone,Copy,Debug,Eq,PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[allow(dead_code)]
 pub enum Integrator {
     QAG,
     QAGIU,
 }
 
-
-pub struct IntegrationBuilder<'a, F: 'a> where F: FnMut(f64) -> f64 {
+pub struct IntegrationBuilder<'a, F: 'a>
+where
+    F: FnMut(f64) -> f64,
+{
     workspace: &'a mut IntegrationWorkspace,
     function: F,
     kind: Integrator,
@@ -110,16 +108,28 @@ pub struct IntegrationBuilder<'a, F: 'a> where F: FnMut(f64) -> f64 {
     epsrel: f64,
 }
 
-
-extern "C" fn rust_integrand<F>(x: f64, ctxt: *mut raw::c_void) -> f64 where F: FnMut(f64) -> f64 {
+extern "C" fn rust_integrand<F>(x: f64, ctxt: *mut raw::c_void) -> f64
+where
+    F: FnMut(f64) -> f64,
+{
     let f: &mut F = unsafe { mem::transmute(ctxt) };
     f(x)
 }
 
-
-impl<'a, F: 'a> IntegrationBuilder<'a, F> where F: FnMut(f64) -> f64 {
-    pub fn new(ws: &'a mut IntegrationWorkspace, f: F, kind: Integrator,
-           lower: f64, upper: f64) -> IntegrationBuilder<'a, F> where F: FnMut(f64) -> f64 {
+impl<'a, F: 'a> IntegrationBuilder<'a, F>
+where
+    F: FnMut(f64) -> f64,
+{
+    pub fn new(
+        ws: &'a mut IntegrationWorkspace,
+        f: F,
+        kind: Integrator,
+        lower: f64,
+        upper: f64,
+    ) -> IntegrationBuilder<'a, F>
+    where
+        F: FnMut(f64) -> f64,
+    {
         IntegrationBuilder {
             workspace: ws,
             function: f,
@@ -166,7 +176,7 @@ impl<'a, F: 'a> IntegrationBuilder<'a, F> where F: FnMut(f64) -> f64 {
                     self.rule as raw::c_int,
                     self.workspace.handle,
                     &mut result,
-                    &mut abserr
+                    &mut abserr,
                 )
             },
             Integrator::QAGIU => unsafe {
@@ -178,7 +188,7 @@ impl<'a, F: 'a> IntegrationBuilder<'a, F> where F: FnMut(f64) -> f64 {
                     (*self.workspace.handle).limit,
                     self.workspace.handle,
                     &mut result,
-                    &mut abserr
+                    &mut abserr,
                 )
             },
         };
@@ -188,27 +198,42 @@ impl<'a, F: 'a> IntegrationBuilder<'a, F> where F: FnMut(f64) -> f64 {
         if err != 0 {
             Err(GslError::new(err))
         } else {
-            Ok(IntegrationResult { value: result, abserr: abserr })
+            Ok(IntegrationResult {
+                value: result,
+                abserr: abserr,
+            })
         }
     }
 }
 
-
 impl IntegrationWorkspace {
     #[allow(dead_code)]
-    pub fn qagiu<'a, F>(&'a mut self, f: F, lower_bound: f64) -> IntegrationBuilder<'a, F> where F: FnMut(f64) -> f64 {
+    pub fn qagiu<'a, F>(&'a mut self, f: F, lower_bound: f64) -> IntegrationBuilder<'a, F>
+    where
+        F: FnMut(f64) -> f64,
+    {
         IntegrationBuilder::new(self, f, Integrator::QAGIU, lower_bound, f64::NAN)
     }
 
-    pub fn qag<'a, F>(&'a mut self, f: F, lower_bound: f64, upper_bound: f64) -> IntegrationBuilder<'a, F> where F: FnMut(f64) -> f64 {
+    pub fn qag<'a, F>(
+        &'a mut self,
+        f: F,
+        lower_bound: f64,
+        upper_bound: f64,
+    ) -> IntegrationBuilder<'a, F>
+    where
+        F: FnMut(f64) -> f64,
+    {
         IntegrationBuilder::new(self, f, Integrator::QAG, lower_bound, upper_bound)
     }
 }
 
-
 /// We abuse the IntegrationResult type here since it is exactly what's called
 /// for here.
-pub fn deriv_central<F>(mut f: F, x: f64, h: f64) -> GslResult<IntegrationResult> where F: FnMut(f64) -> f64 {
+pub fn deriv_central<F>(mut f: F, x: f64, h: f64) -> GslResult<IntegrationResult>
+where
+    F: FnMut(f64) -> f64,
+{
     let mut f = gsl_sys::gsl_function_struct {
         function: Some(rust_integrand::<F>),
         params: &mut f as *mut _ as *mut raw::c_void,
@@ -224,10 +249,12 @@ pub fn deriv_central<F>(mut f: F, x: f64, h: f64) -> GslResult<IntegrationResult
     if err != 0 {
         Err(GslError::new(err))
     } else {
-        Ok(IntegrationResult { value: result, abserr: abserr })
+        Ok(IntegrationResult {
+            value: result,
+            abserr: abserr,
+        })
     }
 }
-
 
 /// Compute the 2F1 hypergeometric function.
 #[allow(non_snake_case)]
