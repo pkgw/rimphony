@@ -1,4 +1,4 @@
-// Copyright 2017 Peter Williams <peter@newton.cx> and collaborators
+// Copyright 2017-2020 Peter Williams <peter@newton.cx> and collaborators
 // Licensed under the GPL version 3.
 
 /// Bindings just to the portions of GSL that we need.
@@ -27,7 +27,7 @@ impl Error for GslError {
         self.message.as_ref()
     }
 
-    fn cause(&self) -> Option<&Error> {
+    fn cause(&self) -> Option<&dyn Error> {
         None
     }
 }
@@ -58,7 +58,7 @@ pub struct IntegrationWorkspace {
 impl IntegrationWorkspace {
     pub fn new(n: usize) -> Self {
         IntegrationWorkspace {
-            handle: unsafe { gsl_sys::gsl_integration_workspace_alloc(n) },
+            handle: unsafe { gsl_sys::gsl_integration_workspace_alloc(n as u64) },
         }
     }
 }
