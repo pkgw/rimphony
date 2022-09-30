@@ -10,7 +10,7 @@ license = "GPLv3"
 [workspace]
 
 [dependencies]
-clap = "^2.26"
+clap = { version = "^4", features = ["cargo"] }
 gsl-sys = { path = "gsl-sys" }
 leung-bessel = { path = "leung-bessel" }
 slog = "^2.2"

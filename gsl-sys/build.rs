@@ -20,9 +20,9 @@ fn main() {
     }
 
     let bindings = builder
-        .whitelist_type("gsl_.*")
-        .whitelist_function("gsl_.*")
-        .blacklist_function("gsl_coerce_long_double") // uses u128 which is not stable
+        .allowlist_type("gsl_.*")
+        .allowlist_function("gsl_.*")
+        .blocklist_function("gsl_coerce_long_double") // uses u128 which is not stable
         .generate()
         .expect("Unable to generate bindings");
 
