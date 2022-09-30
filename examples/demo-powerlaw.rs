@@ -99,25 +99,26 @@ impl Iterator for AlmostUniform1Demo {
 }
 
 fn main() {
-    let matches = clap::App::new(crate_name!())
+    let matches = clap::Command::new(crate_name!())
         .version(crate_version!())
         .about("Compute coefficients for some canned test cases")
         .arg(
-            clap::Arg::with_name("DEMONAME")
+            clap::Arg::new("DEMONAME")
                 .help("Which demo to compute")
                 .required(true)
-                .possible_values(&["almostuniform1"])
+                .value_parser(["almostuniform1"])
                 .index(1),
         )
         .get_matches();
 
     let log = rimphony_test_support::default_log();
 
-    let gen: Box<dyn Iterator<Item = Record>> =
-        Box::new(match matches.value_of("DEMONAME").unwrap() {
+    let gen: Box<dyn Iterator<Item = Record>> = Box::new(
+        match matches.get_one::<String>("DEMONAME").unwrap().as_ref() {
             "almostuniform1" => AlmostUniform1Demo::new(log),
             _ => unreachable!(),
-        });
+        },
+    );
 
     println!(
         "s(lin)\t\
