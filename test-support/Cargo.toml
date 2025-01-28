@@ -8,7 +8,7 @@ authors = ["Peter Williams <peter@newton.cx>"]
 license = "GPLv3"
 
 [dependencies]
-rand = "^0.8"
+rand = "^0.9"
 slog = "^2.2"
 slog-async = "^2.3"
 slog-term = "^2.4"
